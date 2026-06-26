@@ -1,0 +1,33 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.DotSettings.user
+
+## Node
+node_modules/
+dist/
+.env.local
+
+## IDE
+.idea/
+*.swp
+*.swo
+*~
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Docker
+docker/data/
+
+## Env
+.env
+appsettings.Development.json
+
+## Test
+coverage/
+TestResults/
