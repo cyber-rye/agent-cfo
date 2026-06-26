@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AgentCfo.Api/AgentCfo.Api.csproj" />
+    <Project Path="src/AgentCfo.Application/AgentCfo.Application.csproj" />
+    <Project Path="src/AgentCfo.Core/AgentCfo.Core.csproj" />
+    <Project Path="src/AgentCfo.Infrastructure/AgentCfo.Infrastructure.csproj" />
+  </Folder>
+</Solution>
