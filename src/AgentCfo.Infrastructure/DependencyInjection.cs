@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<StripeWebhookService>();
         services.AddScoped<IRevenueMetricsService, RevenueMetricsService>();
         services.AddScoped<IForecastService, ForecastService>();
+        services.AddScoped<IAgentService, AgentService>();
 
         return services;
     }
