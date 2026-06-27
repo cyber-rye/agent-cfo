@@ -56,4 +56,20 @@ public class Forecast : BaseEntity
     }
 }
 
-public record ProjectionPoint(DateOnly Date, Money ProjectedBalance, Money ProjectedRevenue, Money ProjectedExpenses);
+public class ProjectionPoint
+{
+    public DateOnly Date { get; private set; }
+    public Money ProjectedBalance { get; private set; } = Money.Zero();
+    public Money ProjectedRevenue { get; private set; } = Money.Zero();
+    public Money ProjectedExpenses { get; private set; } = Money.Zero();
+
+    private ProjectionPoint() { }
+
+    public ProjectionPoint(DateOnly date, Money projectedBalance, Money projectedRevenue, Money projectedExpenses)
+    {
+        Date = date;
+        ProjectedBalance = projectedBalance;
+        ProjectedRevenue = projectedRevenue;
+        ProjectedExpenses = projectedExpenses;
+    }
+}

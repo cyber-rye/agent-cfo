@@ -21,7 +21,7 @@ public class Transaction : BaseEntity
     
     private Transaction() { }
     
-    public static Transaction CreateRevenue(Guid organizationId, Money amount, string description, string? stripeEventId = null, string? stripePaymentIntentId = null)
+    public static Transaction CreateRevenue(Guid organizationId, Money amount, string description, string? stripeEventId = null, string? stripePaymentIntentId = null, DateTime? occurredAt = null)
     {
         return new Transaction
         {
@@ -33,11 +33,11 @@ public class Transaction : BaseEntity
             Status = TransactionStatus.Completed,
             StripeEventId = stripeEventId,
             StripePaymentIntentId = stripePaymentIntentId,
-            OccurredAt = DateTime.UtcNow
+            OccurredAt = occurredAt ?? DateTime.UtcNow
         };
     }
     
-    public static Transaction CreateExpense(Guid organizationId, Money amount, string description, ExpenseCategory category, string? stripeEventId = null)
+    public static Transaction CreateExpense(Guid organizationId, Money amount, string description, ExpenseCategory category, string? stripeEventId = null, DateTime? occurredAt = null)
     {
         return new Transaction
         {
@@ -48,11 +48,11 @@ public class Transaction : BaseEntity
             Category = category,
             Status = TransactionStatus.Completed,
             StripeEventId = stripeEventId,
-            OccurredAt = DateTime.UtcNow
+            OccurredAt = occurredAt ?? DateTime.UtcNow
         };
     }
     
-    public static Transaction CreateRefund(Guid organizationId, Money amount, string description, string? stripePaymentIntentId = null)
+    public static Transaction CreateRefund(Guid organizationId, Money amount, string description, string? stripePaymentIntentId = null, DateTime? occurredAt = null)
     {
         return new Transaction
         {
@@ -62,7 +62,7 @@ public class Transaction : BaseEntity
             Description = description,
             Status = TransactionStatus.Refunded,
             StripePaymentIntentId = stripePaymentIntentId,
-            OccurredAt = DateTime.UtcNow
+            OccurredAt = occurredAt ?? DateTime.UtcNow
         };
     }
     

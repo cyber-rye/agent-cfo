@@ -1,3 +1,4 @@
+using AgentCfo.Api.Controllers;
 using AgentCfo.Application;
 using AgentCfo.Infrastructure;
 
@@ -10,6 +11,9 @@ builder.Services.AddSwaggerGen();
 // Add application layers
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Stripe configuration
+builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection("Stripe"));
 
 // CORS for dashboard
 builder.Services.AddCors(options =>

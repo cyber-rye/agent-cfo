@@ -28,7 +28,31 @@ public class ForecastConfiguration : IEntityTypeConfiguration<Forecast>
             mr.Property(m => m.Amount).HasColumnType("decimal(18,2)");
             mr.Property(m => m.Currency).HasMaxLength(3);
         });
-        
+
+        builder.OwnsMany(f => f.ProjectionPoints, pp =>
+        {
+            pp.WithOwner().HasForeignKey("ForecastId");
+            pp.Property<Guid>("Id").ValueGeneratedOnAdd();
+            pp.HasKey("Id");
+            pp.ToTable("ProjectionPoints");
+
+            pp.OwnsOne(p => p.ProjectedBalance, pb =>
+            {
+                pb.Property(m => m.Amount).HasColumnType("decimal(18,2)");
+                pb.Property(m => m.Currency).HasMaxLength(3);
+            });
+            pp.OwnsOne(p => p.ProjectedRevenue, pr =>
+            {
+                pr.Property(m => m.Amount).HasColumnType("decimal(18,2)");
+                pr.Property(m => m.Currency).HasMaxLength(3);
+            });
+            pp.OwnsOne(p => p.ProjectedExpenses, pe =>
+            {
+                pe.Property(m => m.Amount).HasColumnType("decimal(18,2)");
+                pe.Property(m => m.Currency).HasMaxLength(3);
+            });
+        });
+
         builder.HasOne(f => f.Organization)
             .WithMany(o => o.Forecasts)
             .HasForeignKey(f => f.OrganizationId)

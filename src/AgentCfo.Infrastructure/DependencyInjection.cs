@@ -14,13 +14,21 @@ public static class DependencyInjection
     {
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
-        
+
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>());
+
+        // Repositories
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<IBudgetRepository, BudgetRepository>();
+        services.AddScoped<IAgentDecisionRepository, AgentDecisionRepository>();
+        services.AddScoped<IAuditEntryRepository, AuditEntryRepository>();
+
+        // Services
         services.AddScoped<StripeWebhookService>();
-        
+        services.AddScoped<IRevenueMetricsService, RevenueMetricsService>();
+        services.AddScoped<IForecastService, ForecastService>();
+
         return services;
     }
 }

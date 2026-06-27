@@ -9,13 +9,21 @@ namespace AgentCfo.Api.Controllers;
 public class ForecastsController : ControllerBase
 {
     private readonly IMediator _mediator;
-    
+
     public ForecastsController(IMediator mediator) => _mediator = mediator;
-    
+
     [HttpGet("{organizationId:guid}")]
     public async Task<IActionResult> GetCurrentForecast(Guid organizationId, [FromQuery] string? scenario = null)
     {
         var result = await _mediator.Send(new GetCurrentForecast.Query(organizationId, scenario));
+        if (result is null) return NotFound();
+        return Ok(result);
+    }
+
+    [HttpGet("{organizationId:guid}/revenue")]
+    public async Task<IActionResult> GetRevenueMetrics(Guid organizationId)
+    {
+        var result = await _mediator.Send(new GetRevenueMetrics.Query(organizationId));
         if (result is null) return NotFound();
         return Ok(result);
     }
