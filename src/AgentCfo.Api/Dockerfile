@@ -9,7 +9,7 @@ COPY src/AgentCfo.Api/AgentCfo.Api.csproj src/AgentCfo.Api/
 RUN dotnet restore src/AgentCfo.Api/AgentCfo.Api.csproj
 
 # Copy source and build
-COPY src/ .
+COPY src/ src/
 RUN dotnet publish src/AgentCfo.Api/AgentCfo.Api.csproj -c Release -o /app/publish
 
 # Runtime
