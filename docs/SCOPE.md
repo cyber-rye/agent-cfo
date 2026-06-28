@@ -46,9 +46,9 @@ These features must work end-to-end for the demo to land.
 - [ ] Slack/Discord notifications for agent decisions
 - [ ] Multi-organization support
 - [ ] Agent self-improvement (learning from past decisions)
-- [ ] Animated typing effect for agent reasoning (see DELIGHT_IDEAS.md)
+- [x] Animated typing effect for agent reasoning (see DELIGHT_IDEAS.md) ✅
 - [ ] Agent confidence scoring (see DELIGHT_IDEAS.md)
-- [ ] Toast notifications for agent decisions (see DELIGHT_IDEAS.md)
+- [x] Toast notifications for agent decisions (see DELIGHT_IDEAS.md) ✅
 
 ## Explicitly Out of Scope
 
@@ -86,7 +86,7 @@ These features must work end-to-end for the demo to land.
 - [x] End-to-end integration testing
 
 ### Day 4 (Monday) — Demo + Submit ⬅️ NEXT
-- [ ] Polish dashboard (loading states, error handling, wow factors)
+- [x] Polish dashboard (loading states, error handling, wow factors) ✅
 - [ ] Demo script rehearsal — 6 scenes, 90-120 seconds total
 - [ ] Record demo video (screen capture + narration)
 - [ ] Write Twitter thread with video
