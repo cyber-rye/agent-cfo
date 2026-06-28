@@ -43,11 +43,9 @@ public class PolicyBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, T
                     _logger.LogWarning("Policy: BLOCKED - Budget exceeded for {Category}. Limit: {Limit}, Current: {Current}, Requested: {Requested}",
                         budget.Category, budget.MonthlyLimit, budget.CurrentSpend, amount);
 
-                    // For commands, we can throw; for queries, we just log
-                    if (request is not IRequest<TResponse>)
-                        throw new PolicyViolationException(
-                            $"Budget exceeded for {budget.Category}: limit is {budget.MonthlyLimit}, " +
-                            $"current spend is {budget.CurrentSpend}, requested {amount}");
+                    throw new PolicyViolationException(
+                        $"Budget exceeded for {budget.Category}: limit is {budget.MonthlyLimit}, " +
+                        $"current spend is {budget.CurrentSpend}, requested {amount}");
                 }
 
                 // Check alert threshold

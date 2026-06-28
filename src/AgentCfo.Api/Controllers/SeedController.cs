@@ -119,7 +119,7 @@ public class SeedController : ControllerBase
         foreach (var tx in transactions)
             await _transactionRepo.AddAsync(tx, ct);
 
-        // Seed budgets
+        // Seed budgets and sync current spend
         var budgets = new[]
         {
             Budget.Create(orgId, ExpenseCategory.Infrastructure, Money.From(3000, "USD"), true, 80),
@@ -129,8 +129,20 @@ public class SeedController : ControllerBase
             Budget.Create(orgId, ExpenseCategory.Office, Money.From(1500, "USD"), true, 90),
         };
 
+        // Sync budget CurrentSpend with current month expenses
+        var currentMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var currentMonthExpenses = transactions
+            .Where(t => t.Type == TransactionType.Expense && t.OccurredAt >= currentMonthStart)
+            .ToList();
+
         foreach (var budget in budgets)
+        {
+            var categorySpend = currentMonthExpenses
+                .Where(t => t.Category == budget.Category)
+                .Aggregate(Money.Zero(), (acc, t) => acc.Add(t.Amount));
+            budget.RecordSpend(categorySpend);
             await _budgetRepo.AddAsync(budget, ct);
+        }
 
         // Seed agent decisions with realistic timestamps
         var decisions = new[]
