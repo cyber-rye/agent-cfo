@@ -20,6 +20,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [isNewBatch, setIsNewBatch] = useState(false);
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
   const [apiError, setApiError] = useState(false);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
@@ -86,6 +87,7 @@ export default function App() {
     if (!orgId) return;
     setAnalyzing(true);
     setAgentStatus('analyzing');
+    setIsNewBatch(true);
     try {
       await api.runFullAnalysis(orgId);
       await loadData(orgId);
@@ -259,7 +261,7 @@ export default function App() {
                 {budgets.length > 0 && <BudgetStatus budgets={budgets} />}
               </div>
               <div>
-                <AgentFeed decisions={decisions} />
+                <AgentFeed decisions={decisions} isNewBatch={isNewBatch} />
               </div>
             </div>
           </div>
