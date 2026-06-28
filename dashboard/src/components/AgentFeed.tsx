@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, XCircle, FileText, BarChart3 } from 'lucide-react';
 import type { AgentDecision } from '../api/types';
+import { TypewriterText } from './TypewriterText';
 
 const typeConfig: Record<string, { color: string; icon: typeof CheckCircle; bg: string }> = {
   ExpenseApproved: { color: 'text-emerald-400', icon: CheckCircle, bg: 'bg-emerald-400/10' },
@@ -14,13 +15,21 @@ const typeConfig: Record<string, { color: string; icon: typeof CheckCircle; bg: 
 
 function DecisionItem({ decision }: { decision: AgentDecision }) {
   const [expanded, setExpanded] = useState(false);
+  const [hasBeenExpanded, setHasBeenExpanded] = useState(false);
   const config = typeConfig[decision.type] || { color: 'text-gray-400', icon: FileText, bg: 'bg-gray-400/10' };
   const Icon = config.icon;
+
+  const handleToggle = () => {
+    if (!expanded) {
+      setHasBeenExpanded(true);
+    }
+    setExpanded(!expanded);
+  };
 
   return (
     <div className="border border-gray-700 rounded-lg p-4 hover:border-gray-600 transition-colors">
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleToggle}
         className="w-full flex items-start gap-3 text-left"
       >
         <div className={`p-2 rounded-lg ${config.bg} shrink-0 mt-0.5`}>
@@ -42,8 +51,12 @@ function DecisionItem({ decision }: { decision: AgentDecision }) {
         </div>
       </button>
       {expanded && (
-        <div className="mt-3 ml-11 text-sm text-gray-300 leading-relaxed whitespace-pre-wrap bg-gray-900 rounded-lg p-3 border border-gray-700">
-          {decision.reasoning}
+        <div className="mt-3 ml-11 text-sm text-gray-300 leading-relaxed bg-gray-900 rounded-lg p-3 border border-gray-700">
+          {!hasBeenExpanded ? (
+            <TypewriterText text={decision.reasoning} speed={15} />
+          ) : (
+            <span className="whitespace-pre-wrap">{decision.reasoning}</span>
+          )}
         </div>
       )}
     </div>
