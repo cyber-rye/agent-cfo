@@ -15,28 +15,22 @@ const typeConfig: Record<string, { color: string; icon: typeof CheckCircle; bg: 
 
 interface DecisionItemProps {
   decision: AgentDecision;
-  forceExpanded: boolean;
-  isNew: boolean;
-  onTypingDone: (id: string) => void;
+  expanded: boolean;
+  useTyping: boolean;
 }
 
-function DecisionItem({ decision, forceExpanded, isNew, onTypingDone }: DecisionItemProps) {
+function DecisionItem({ decision, expanded, useTyping }: DecisionItemProps) {
   const [userToggled, setUserToggled] = useState<boolean | null>(null);
   const [typingDone, setTypingDone] = useState(false);
   const config = typeConfig[decision.type] || { color: 'text-gray-400', icon: FileText, bg: 'bg-gray-400/10' };
   const Icon = config.icon;
 
-  // Expanded = forceExpanded unless user explicitly toggled
-  const expanded = userToggled !== null ? userToggled : forceExpanded;
-
-  const handleClick = () => {
-    setUserToggled(!expanded);
-  };
+  const isOpen = userToggled !== null ? userToggled : expanded;
 
   return (
     <div className="border border-gray-700 rounded-lg p-4 hover:border-gray-600 transition-colors">
       <button
-        onClick={handleClick}
+        onClick={() => setUserToggled(prev => prev !== null ? !prev : !expanded)}
         className="w-full flex items-start gap-3 text-left"
       >
         <div className={`p-2 rounded-lg ${config.bg} shrink-0 mt-0.5`}>
@@ -54,16 +48,13 @@ function DecisionItem({ decision, forceExpanded, isNew, onTypingDone }: Decision
           <p className="text-white text-sm mt-1 font-medium">{decision.description}</p>
         </div>
         <div className="text-gray-500 shrink-0 mt-1">
-          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </div>
       </button>
-      {expanded && (
+      {isOpen && (
         <div className="mt-3 ml-11 text-sm text-gray-300 leading-relaxed bg-gray-900 rounded-lg p-3 border border-gray-700">
-          {(isNew && !typingDone) ? (
-            <TypewriterText text={decision.reasoning} speed={15} onComplete={() => {
-              setTypingDone(true);
-              onTypingDone(decision.id);
-            }} />
+          {(useTyping && !typingDone) ? (
+            <TypewriterText text={decision.reasoning} speed={15} onComplete={() => setTypingDone(true)} />
           ) : (
             <span className="whitespace-pre-wrap">{decision.reasoning}</span>
           )}
@@ -75,49 +66,25 @@ function DecisionItem({ decision, forceExpanded, isNew, onTypingDone }: Decision
 
 interface AgentFeedProps {
   decisions: AgentDecision[];
-  isNewBatch?: boolean; // true when Run Analysis just completed
+  typingIds?: Set<string>; // IDs that should use typing effect
 }
 
-export function AgentFeed({ decisions, isNewBatch = false }: AgentFeedProps) {
-  const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
-  const [newIds, setNewIds] = useState<Set<string>>(new Set());
-  const prevBatchRef = useRef(false);
+export function AgentFeed({ decisions, typingIds }: AgentFeedProps) {
+  // On initial load, expand all. On subsequent updates, only expand typing items.
   const initialLoadRef = useRef(true);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  // Track which decisions are new
   useEffect(() => {
-    const currentIds = new Set(decisions.map(d => d.id));
-    const fresh = new Set<string>();
-
     if (initialLoadRef.current && decisions.length > 0) {
-      // First load — all decisions are "new" (expanded with typing)
-      for (const id of currentIds) fresh.add(id);
+      // First load — expand everything, no typing
+      setExpandedIds(new Set(decisions.map(d => d.id)));
       initialLoadRef.current = false;
-    } else if (isNewBatch && !prevBatchRef.current) {
-      // Run Analysis just triggered — decisions that weren't seen are "new"
-      for (const id of currentIds) {
-        if (!seenIds.has(id)) fresh.add(id);
-      }
     }
-
-    setNewIds(fresh);
-    prevBatchRef.current = isNewBatch;
-
-    // Update seen IDs
-    setSeenIds(prev => {
-      const next = new Set(prev);
-      for (const id of currentIds) next.add(id);
-      return next;
-    });
-  }, [decisions, isNewBatch]);
-
-  const handleTypingDone = (id: string) => {
-    setNewIds(prev => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  };
+    // When typingIds changes (Run Analysis), expand those IDs
+    if (typingIds && typingIds.size > 0) {
+      setExpandedIds(new Set(typingIds));
+    }
+  }, [decisions, typingIds]);
 
   return (
     <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
@@ -133,9 +100,8 @@ export function AgentFeed({ decisions, isNewBatch = false }: AgentFeedProps) {
             <DecisionItem
               key={d.id}
               decision={d}
-              forceExpanded={newIds.has(d.id) ? true : false}
-              isNew={newIds.has(d.id)}
-              onTypingDone={handleTypingDone}
+              expanded={expandedIds.has(d.id)}
+              useTyping={typingIds?.has(d.id) ?? false}
             />
           ))
         )}

@@ -20,7 +20,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [isNewBatch, setIsNewBatch] = useState(false);
+  const [typingIds, setTypingIds] = useState<Set<string>>(new Set());
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
   const [apiError, setApiError] = useState(false);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
@@ -87,14 +87,22 @@ export default function App() {
     if (!orgId) return;
     setAnalyzing(true);
     setAgentStatus('analyzing');
-    setIsNewBatch(true);
     try {
+      // Save current IDs before analysis
+      const currentIds = new Set(decisions.map(d => d.id));
+      
       await api.runFullAnalysis(orgId);
       await loadData(orgId);
 
+      // Find new decision IDs (not in the previous set)
+      const updatedDecisions = await api.getDecisions(orgId, 10);
+      const newIds = new Set(
+        updatedDecisions.filter(d => !currentIds.has(d.id)).map(d => d.id)
+      );
+      setTypingIds(newIds);
+
       // Show toasts for new decisions
-      const updatedDecisions = await api.getDecisions(orgId, 5);
-      const newOnes = updatedDecisions.filter(d => !decisions.some(existing => existing.id === d.id));
+      const newOnes = updatedDecisions.filter(d => newIds.has(d.id));
       for (const d of newOnes.slice(0, 3)) {
         addToast(d.type, d.description, d.reasoning.slice(0, 100) + '...');
       }
@@ -261,7 +269,7 @@ export default function App() {
                 {budgets.length > 0 && <BudgetStatus budgets={budgets} />}
               </div>
               <div>
-                <AgentFeed decisions={decisions} isNewBatch={isNewBatch} />
+                <AgentFeed decisions={decisions} typingIds={typingIds} />
               </div>
             </div>
           </div>
