@@ -249,7 +249,6 @@ public class AgentService : IAgentService
 
         if (anomalies.Any())
         {
-            var anomalyList = string.Join("; ", anomalies);
             decision = AgentDecision.Propose(
                 organizationId,
                 AgentDecisionType.AnomalyDetected,

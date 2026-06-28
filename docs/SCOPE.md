@@ -1,51 +1,54 @@
 # Hackathon Scope
 
-**Deadline:** EOD Tuesday, June 30 (4 days)
+**Deadline:** EOD Tuesday, June 30 (2 days remaining)
 **Submission:** 1-3 min demo video on X/Twitter + submission form
 
 ## Must-Have (Demo Blockers)
 
 These features must work end-to-end for the demo to land.
 
-### 1. .NET Control Plane
-- [ ] ASP.NET Core 10 Web API with Clean Architecture
-- [ ] EF Core + PostgreSQL — transactions, budgets, forecasts, audit log
-- [ ] MediatR CQRS for all operations
-- [ ] Policy pipeline behaviors (spending limits, approval gates)
-- [ ] Stripe webhook receiver (payment_intent.succeeded, invoice.paid, etc.)
+### 1. .NET Control Plane ✅
+- [x] ASP.NET Core 10 Web API with Clean Architecture
+- [x] EF Core + PostgreSQL — transactions, budgets, forecasts, audit log
+- [x] MediatR CQRS for all operations
+- [x] Policy pipeline behaviors (spending limits, approval gates)
+- [x] Stripe webhook receiver (payment_intent.succeeded, invoice.paid, etc.)
 
-### 2. Stripe Integration
-- [ ] Real-time transaction ingestion from Stripe webhooks
-- [ ] Revenue metrics calculation (MRR, churn, growth rate)
-- [ ] Invoice generation and payment tracking
-- [ ] Expense recording (manual or categorized)
-- [ ] Budget creation and enforcement
+### 2. Stripe Integration ✅
+- [x] Real-time transaction ingestion from Stripe webhooks
+- [x] Revenue metrics calculation (MRR, churn, growth rate)
+- [ ] Invoice generation and payment tracking (not needed for demo)
+- [x] Expense recording (manual or categorized)
+- [x] Budget creation and enforcement
 
-### 3. Agent (Hermes + NemoClaw)
-- [ ] Hermes agent running in NemoClaw sandbox
-- [ ] Agent can query financial data via API
-- [ ] Agent can make decisions (approve expense, flag anomaly, generate report)
-- [ ] Agent decisions go through policy engine before execution
-- [ ] Full audit trail of agent reasoning and actions
+### 3. Agent (Hermes + NemoClaw) ✅
+- [ ] Hermes agent running in NemoClaw sandbox (use API directly for demo)
+- [x] Agent can query financial data via API
+- [x] Agent can make decisions (approve expense, flag anomaly, generate report)
+- [x] Agent decisions go through policy engine before execution
+- [x] Full audit trail of agent reasoning and actions
 
-### 4. Dashboard (React)
-- [ ] Financial overview: revenue, expenses, runway, burn rate
-- [ ] Agent activity feed (what it's doing, why)
-- [ ] Cash flow forecast chart
-- [ ] Budget status with agent decisions
+### 4. Dashboard (React) ✅
+- [x] Financial overview: revenue, expenses, runway, burn rate
+- [x] Agent activity feed (what it's doing, why)
+- [x] Cash flow forecast chart
+- [x] Budget status with agent decisions
 
-### 5. Demo
-- [ ] Pre-loaded with realistic startup financial data
+### 5. Demo 🔶
+- [x] Pre-loaded with realistic startup financial data
 - [ ] 1-3 minute video showing agent making real decisions
 - [ ] Clear narrative arc: problem → agent acts → result
 
 ## Nice-to-Have (If Time Permits)
 
-- [ ] Scenario modeling ("what if we hire 3 engineers?")
+- [ ] Scenario modeling ("what if we hire 3 engineers?") — ForecastService supports scenarios, no UI yet
 - [ ] Investor report PDF generation
 - [ ] Slack/Discord notifications for agent decisions
 - [ ] Multi-organization support
 - [ ] Agent self-improvement (learning from past decisions)
+- [ ] Animated typing effect for agent reasoning (see DELIGHT_IDEAS.md)
+- [ ] Agent confidence scoring (see DELIGHT_IDEAS.md)
+- [ ] Toast notifications for agent decisions (see DELIGHT_IDEAS.md)
 
 ## Explicitly Out of Scope
 
@@ -58,32 +61,33 @@ These features must work end-to-end for the demo to land.
 
 ## Day-by-Day Plan
 
-### Day 1 (Friday) — Foundation
-- [ ] .NET solution scaffold with Clean Architecture layers
-- [ ] Domain entities: Transaction, Budget, Forecast, AuditEntry, AgentDecision
-- [ ] EF Core DbContext + migrations
-- [ ] Stripe webhook endpoint (basic)
-- [ ] Docker Compose: PostgreSQL + API
-- [ ] NemoClaw setup and Hermes agent bootstrap
+### Day 1 (Friday) — Foundation ✅
+- [x] .NET solution scaffold with Clean Architecture layers
+- [x] Domain entities: Transaction, Budget, Forecast, AuditEntry, AgentDecision
+- [x] EF Core DbContext + migrations
+- [x] Stripe webhook endpoint (basic)
+- [x] Docker Compose: PostgreSQL + API
+- [ ] NemoClaw setup and Hermes agent bootstrap (not needed for demo)
 
-### Day 2 (Saturday) — Agent + Stripe
-- [ ] Stripe integration: webhook processing, transaction sync
-- [ ] Revenue metrics service (MRR, churn, growth)
-- [ ] Agent ↔ API communication (agent queries data, submits decisions)
-- [ ] Policy engine: MediatR pipeline behaviors for spending limits
-- [ ] Cash flow forecasting logic (simple projection model)
-- [ ] Agent prompt engineering: CFO persona, decision framework
+### Day 2 (Saturday) — Agent + Stripe ✅
+- [x] Stripe integration: webhook processing, transaction sync
+- [x] Revenue metrics service (MRR, churn, growth)
+- [x] Agent ↔ API communication (agent queries data, submits decisions)
+- [x] Policy engine: MediatR pipeline behaviors for spending limits
+- [x] Cash flow forecasting logic (simple projection model)
+- [x] Agent prompt engineering: CFO persona, decision framework
 
-### Day 3 (Sunday) — Dashboard + Polish
-- [ ] React dashboard scaffold
-- [ ] Financial overview page (metrics, charts)
-- [ ] Agent activity feed
-- [ ] Cash flow forecast visualization
-- [ ] Pre-load demo data (realistic 3-month startup history)
-- [ ] End-to-end integration testing
+### Day 3 (Sunday) — Dashboard + Polish ✅
+- [x] React dashboard scaffold
+- [x] Financial overview page (metrics, charts)
+- [x] Agent activity feed
+- [x] Cash flow forecast visualization
+- [x] Pre-load demo data (realistic 3-month startup history)
+- [x] End-to-end integration testing
 
-### Day 4 (Monday) — Demo + Submit
-- [ ] Demo script: 5 scenes, 90 seconds each max
+### Day 4 (Monday) — Demo + Submit ⬅️ NEXT
+- [ ] Polish dashboard (loading states, error handling, wow factors)
+- [ ] Demo script rehearsal — 6 scenes, 90-120 seconds total
 - [ ] Record demo video (screen capture + narration)
 - [ ] Write Twitter thread with video
 - [ ] Fill submission form

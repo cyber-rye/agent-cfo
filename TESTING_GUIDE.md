@@ -282,6 +282,6 @@ Never raw decimals for currency. `Money.From(100, "USD")` ensures currency-aware
 | Dashboard shows "Welcome" with no data | Click "Seed Demo Data" |
 | API returns 500 | Check PostgreSQL is running: `docker ps` |
 | Dashboard can't reach API | Verify API on port 5000: `curl localhost:5000/swagger` |
-| Budget shows 0% | Re-seed: `curl -X POST localhost:5000/api/seed/demo` |
+| Budget shows 0% | FIXED in Session 3 — budgets now sync spend. If stale, re-seed: `curl -X POST localhost:5000/api/seed/demo` |
 | Agent decisions missing | Click "Run Analysis" or call `POST /api/agent/{id}/run-full-analysis` |
 | TypeScript errors in dashboard | Run `cd dashboard && npx tsc -b` to see details |
