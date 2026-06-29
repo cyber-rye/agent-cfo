@@ -30,9 +30,12 @@ These features must work end-to-end for the demo to land.
 
 ### 4. Dashboard (React) ✅
 - [x] Financial overview: revenue, expenses, runway, burn rate
-- [x] Agent activity feed (what it's doing, why)
-- [x] Cash flow forecast chart
+- [x] Agent activity feed with typewriter reasoning
+- [x] Cash flow forecast (collapsible: compact numbers + expandable chart)
 - [x] Budget status with agent decisions
+- [x] Expense evaluator (ask → evaluate → approve → record)
+- [x] Audit trail panel
+- [x] Agent-first layout (feed = 2/3 width, sidebar = 1/3)
 
 ### 5. Demo 🔶
 - [x] Pre-loaded with realistic startup financial data
@@ -41,14 +44,24 @@ These features must work end-to-end for the demo to land.
 
 ## Nice-to-Have (If Time Permits)
 
-- [ ] Scenario modeling ("what if we hire 3 engineers?") — ForecastService supports scenarios, no UI yet
+- [ ] Scenario modeling ("what if we hire 3 engineers?") — API supports `?scenario=`, no UI dropdown yet
+- [ ] Quick action buttons (individual agent capabilities)
+- [ ] Financial summary viewer (generate-summary returns markdown)
+- [ ] Governance panel (what the agent can/can't do)
 - [ ] Investor report PDF generation
 - [ ] Slack/Discord notifications for agent decisions
 - [ ] Multi-organization support
 - [ ] Agent self-improvement (learning from past decisions)
-- [x] Animated typing effect for agent reasoning (see DELIGHT_IDEAS.md) ✅
-- [ ] Agent confidence scoring (see DELIGHT_IDEAS.md)
-- [x] Toast notifications for agent decisions (see DELIGHT_IDEAS.md) ✅
+- [x] Animated typing effect for agent reasoning ✅
+- [x] Toast notifications for agent decisions ✅
+- [x] Agent status indicator ✅
+- [x] Error handling + stale localStorage recovery ✅
+- [x] Founder persona banner ✅
+- [x] Expense evaluator (ask → evaluate → approve → record) ✅
+- [x] Audit trail panel ✅
+- [x] Collapsible forecast chart ✅
+- [x] Agent-first layout restructure ✅
+- [ ] Agent confidence scoring
 
 ## Explicitly Out of Scope
 
