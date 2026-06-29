@@ -4,10 +4,12 @@ import { api } from './api/client';
 import type { DashboardSummary, ForecastResponse, RevenueMetrics, BudgetResponse, AgentDecision } from './api/types';
 import { MetricCard } from './components/MetricCard';
 import { AgentFeed } from './components/AgentFeed';
+import { QuickActions } from './components/QuickActions';
 import { ExpenseEvaluator } from './components/ExpenseEvaluator';
 import { ForecastChart } from './components/ForecastChart';
 import { BudgetStatus } from './components/BudgetStatus';
 import { AuditTrail } from './components/AuditTrail';
+import { GovernancePanel } from './components/GovernancePanel';
 import { ToastContainer, useToasts } from './components/Toast';
 
 const ORG_KEY = 'agentcfo_org_id';
@@ -30,6 +32,7 @@ export default function App() {
   const [revenue, setRevenue] = useState<RevenueMetrics | null>(null);
   const [budgets, setBudgets] = useState<BudgetResponse[]>([]);
   const [decisions, setDecisions] = useState<AgentDecision[]>([]);
+  const [scenarioLoading, setScenarioLoading] = useState(false);
   const { toasts, addToast, dismissToast } = useToasts();
 
   const loadData = useCallback(async (id: string) => {
@@ -116,6 +119,34 @@ export default function App() {
     } finally {
       setAnalyzing(false);
       if (agentStatus === 'analyzing') setAgentStatus('idle');
+    }
+  };
+
+  const handleScenarioChange = async (scenario: string) => {
+    if (!orgId) return;
+    setScenarioLoading(true);
+    try {
+      const fc = await api.getForecast(orgId, scenario);
+      setForecast(fc);
+    } catch (err) {
+      console.error('Scenario fetch failed:', err);
+    } finally {
+      setScenarioLoading(false);
+    }
+  };
+
+  const handleQuickActionComplete = async () => {
+    if (!orgId) return;
+    // Refresh decisions and forecast after a quick action
+    try {
+      const [dec, fc] = await Promise.all([
+        api.getDecisions(orgId, 10),
+        api.getForecast(orgId),
+      ]);
+      setDecisions(dec);
+      setForecast(fc);
+    } catch (err) {
+      console.error('Refresh after quick action failed:', err);
     }
   };
 
@@ -264,16 +295,26 @@ export default function App() {
               />
             </div>
 
-            {/* Agent Feed (primary) + Expense Evaluator + Context sidebar */}
+            {/* Agent Feed (primary) + Quick Actions + Expense Evaluator + Context sidebar */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-4">
                 <AgentFeed decisions={decisions} typingIds={typingIds} />
-                <ExpenseEvaluator orgId={orgId} />
+                <div className="space-y-3">
+                  <QuickActions orgId={orgId} onComplete={handleQuickActionComplete} />
+                  <ExpenseEvaluator orgId={orgId} />
+                </div>
               </div>
               <div className="space-y-4">
-                {forecast && <ForecastChart forecast={forecast} />}
+                {forecast && (
+                  <ForecastChart
+                    forecast={forecast}
+                    onScenarioChange={handleScenarioChange}
+                    scenarioLoading={scenarioLoading}
+                  />
+                )}
                 {budgets.length > 0 && <BudgetStatus budgets={budgets} />}
                 <AuditTrail orgId={orgId} />
+                <GovernancePanel />
               </div>
             </div>
           </div>

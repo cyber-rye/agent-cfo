@@ -37,7 +37,12 @@ export const api = {
   // Agent
   getDecisions: (orgId: string, limit = 20) =>
     get<AgentDecision[]>(`/agent/${orgId}/decisions?limit=${limit}`),
+  // Agent — individual actions
   runFullAnalysis: (orgId: string) => post(`/agent/${orgId}/run-full-analysis`),
+  detectAnomalies: (orgId: string) => post(`/agent/${orgId}/detect-anomalies`),
+  generateForecast: (orgId: string, scenario?: string) =>
+    post(`/agent/${orgId}/generate-forecast${scenario ? `?scenario=${encodeURIComponent(scenario)}` : ''}`),
+  generateSummary: (orgId: string) => post(`/agent/${orgId}/generate-summary`),
 
   // Expense evaluation (agent evaluates, then we can record)
   evaluateExpense: (orgId: string, amount: number, description: string, currency = 'USD') =>

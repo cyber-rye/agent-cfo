@@ -1,7 +1,15 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import type { ForecastResponse } from '../api/types';
+
+const SCENARIOS = [
+  { value: 'base', label: 'Base Case' },
+  { value: 'hire-2-engineers', label: '+2 Engineers' },
+  { value: 'hire-1-engineer', label: '+1 Engineer' },
+  { value: 'expand-mrr-15', label: '+15% MRR' },
+  { value: 'cut-marketing-50', label: 'Cut Marketing 50%' },
+];
 
 function getRunwayColor(days: number): string {
   if (days < 90) return 'bg-red-500';
@@ -15,12 +23,17 @@ function getRunwayTextColor(days: number): string {
   return 'text-emerald-400';
 }
 
-// Normalize runway to a percentage of a "healthy" 36-month scale
 function runwayPercent(days: number): number {
   return Math.min((days / (365 * 3)) * 100, 100);
 }
 
-export function ForecastChart({ forecast }: { forecast: ForecastResponse }) {
+interface ForecastChartProps {
+  forecast: ForecastResponse;
+  onScenarioChange?: (scenario: string) => void;
+  scenarioLoading?: boolean;
+}
+
+export function ForecastChart({ forecast, onScenarioChange, scenarioLoading }: ForecastChartProps) {
   const [expanded, setExpanded] = useState(false);
 
   const data = forecast.projections.map(p => ({
@@ -30,22 +43,45 @@ export function ForecastChart({ forecast }: { forecast: ForecastResponse }) {
     expenses: Math.round(p.projectedExpenses),
   }));
 
+  const currentScenarioLabel = SCENARIOS.find(s => s.value === forecast.scenario)?.label ?? forecast.scenario;
+
   return (
     <div className="bg-gray-800 rounded-xl border border-gray-700">
       {/* Compact header — always visible */}
       <div className="p-4">
-        <button
-          onClick={() => setExpanded(prev => !prev)}
-          className="w-full flex items-center justify-between text-left group"
-        >
+        <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">
             Cash Flow
-            <span className="text-xs font-normal text-gray-500">{forecast.scenario}</span>
+            {scenarioLoading ? (
+              <Loader2 size={12} className="animate-spin text-gray-400" />
+            ) : (
+              <span className="text-xs font-normal text-gray-500">{currentScenarioLabel}</span>
+            )}
           </h2>
-          <span className="text-gray-500 group-hover:text-gray-300 transition-colors">
+          <button
+            onClick={() => setExpanded(prev => !prev)}
+            className="text-gray-500 hover:text-gray-300 transition-colors"
+          >
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </span>
-        </button>
+          </button>
+        </div>
+
+        {/* Scenario selector */}
+        {onScenarioChange && (
+          <div className="mt-2">
+            <select
+              value={forecast.scenario}
+              onChange={e => onScenarioChange(e.target.value)}
+              disabled={scenarioLoading}
+              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-xs text-gray-300
+                         focus:outline-none focus:border-violet-500 disabled:opacity-50"
+            >
+              {SCENARIOS.map(s => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Compact numbers */}
         <div className="mt-3 space-y-3">
