@@ -1,4 +1,8 @@
-import type { DashboardSummary, ForecastResponse, RevenueMetrics, BudgetResponse, AgentDecision } from './types';
+import type {
+  DashboardSummary, ForecastResponse, RevenueMetrics,
+  BudgetResponse, AgentDecision, ExpenseEvaluation,
+  ExpenseRecordResult, AuditEntry,
+} from './types';
 
 const BASE = '/api';
 
@@ -19,11 +23,36 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 }
 
 export const api = {
+  // Dashboard
   getDashboard: (orgId: string) => get<DashboardSummary>(`/dashboard/${orgId}`),
-  getForecast: (orgId: string) => get<ForecastResponse>(`/forecasts/${orgId}`),
+
+  // Forecast
+  getForecast: (orgId: string, scenario?: string) =>
+    get<ForecastResponse>(`/forecasts/${orgId}${scenario ? `?scenario=${encodeURIComponent(scenario)}` : ''}`),
   getRevenueMetrics: (orgId: string) => get<RevenueMetrics>(`/forecasts/${orgId}/revenue`),
+
+  // Budgets
   getBudgets: (orgId: string) => get<BudgetResponse[]>(`/budgets/${orgId}`),
-  getDecisions: (orgId: string, limit = 20) => get<AgentDecision[]>(`/agent/${orgId}/decisions?limit=${limit}`),
+
+  // Agent
+  getDecisions: (orgId: string, limit = 20) =>
+    get<AgentDecision[]>(`/agent/${orgId}/decisions?limit=${limit}`),
   runFullAnalysis: (orgId: string) => post(`/agent/${orgId}/run-full-analysis`),
+
+  // Expense evaluation (agent evaluates, then we can record)
+  evaluateExpense: (orgId: string, amount: number, description: string, currency = 'USD') =>
+    post<ExpenseEvaluation>(`/agent/${orgId}/evaluate-expense`, { amount, description, currency }),
+
+  // Record expense to books (after approval)
+  recordExpense: (orgId: string, amount: number, description: string, category: number, currency = 'USD') =>
+    post<ExpenseRecordResult>('/transactions/expense', {
+      organizationId: orgId, amount, currency, description, category,
+    }),
+
+  // Audit trail
+  getAuditTrail: (orgId: string, limit = 15) =>
+    get<AuditEntry[]>(`/agent/${orgId}/audit?limit=${limit}`),
+
+  // Seed
   seedDemo: () => post<{ organizationId: string }>('/seed/demo'),
 };

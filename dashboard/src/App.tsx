@@ -4,8 +4,10 @@ import { api } from './api/client';
 import type { DashboardSummary, ForecastResponse, RevenueMetrics, BudgetResponse, AgentDecision } from './api/types';
 import { MetricCard } from './components/MetricCard';
 import { AgentFeed } from './components/AgentFeed';
+import { ExpenseEvaluator } from './components/ExpenseEvaluator';
 import { ForecastChart } from './components/ForecastChart';
 import { BudgetStatus } from './components/BudgetStatus';
+import { AuditTrail } from './components/AuditTrail';
 import { ToastContainer, useToasts } from './components/Toast';
 
 const ORG_KEY = 'agentcfo_org_id';
@@ -262,14 +264,16 @@ export default function App() {
               />
             </div>
 
-            {/* Agent Feed (primary) + Context sidebar */}
+            {/* Agent Feed (primary) + Expense Evaluator + Context sidebar */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-2 space-y-4">
                 <AgentFeed decisions={decisions} typingIds={typingIds} />
+                <ExpenseEvaluator orgId={orgId} />
               </div>
               <div className="space-y-4">
                 {forecast && <ForecastChart forecast={forecast} />}
                 {budgets.length > 0 && <BudgetStatus budgets={budgets} />}
+                <AuditTrail orgId={orgId} />
               </div>
             </div>
           </div>

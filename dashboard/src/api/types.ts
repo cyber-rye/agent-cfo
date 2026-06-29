@@ -68,3 +68,29 @@ export interface BudgetResponse {
   isNearLimit: boolean;
   isOverBudget: boolean;
 }
+
+export interface ExpenseEvaluation {
+  id: string;
+  type: string;
+  description: string;
+  reasoning: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface ExpenseRecordResult {
+  transactionId: string;
+  approved: boolean;
+  rejectionReason: string | null;
+}
+
+export interface AuditEntry {
+  id: string;
+  actor: string;
+  actorId: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  createdAt: string;
+  correlationId: string;
+}
