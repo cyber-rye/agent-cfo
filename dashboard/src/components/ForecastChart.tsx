@@ -1,7 +1,28 @@
+import { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import type { ForecastResponse } from '../api/types';
 
+function getRunwayColor(days: number): string {
+  if (days < 90) return 'bg-red-500';
+  if (days < 180) return 'bg-amber-500';
+  return 'bg-emerald-500';
+}
+
+function getRunwayTextColor(days: number): string {
+  if (days < 90) return 'text-red-400';
+  if (days < 180) return 'text-amber-400';
+  return 'text-emerald-400';
+}
+
+// Normalize runway to a percentage of a "healthy" 36-month scale
+function runwayPercent(days: number): number {
+  return Math.min((days / (365 * 3)) * 100, 100);
+}
+
 export function ForecastChart({ forecast }: { forecast: ForecastResponse }) {
+  const [expanded, setExpanded] = useState(false);
+
   const data = forecast.projections.map(p => ({
     date: new Date(p.date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
     balance: Math.round(p.projectedBalance),
@@ -10,39 +31,99 @@ export function ForecastChart({ forecast }: { forecast: ForecastResponse }) {
   }));
 
   return (
-    <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-      <h2 className="text-lg font-semibold text-white mb-1">Cash Flow Forecast</h2>
-      <p className="text-gray-400 text-sm mb-4">
-        Runway: <span className={forecast.runwayDays < 90 ? 'text-red-400 font-medium' : 'text-emerald-400 font-medium'}>
-          {forecast.runwayDays > 3650 ? 'Indefinite' : `${forecast.runwayDays} days`}
-        </span>
-        {' · '}Scenario: {forecast.scenario}
-      </p>
-      <ResponsiveContainer width="100%" height={280}>
-        <AreaChart data={data}>
-          <defs>
-            <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-          <XAxis dataKey="date" stroke="#9ca3af" fontSize={12} />
-          <YAxis stroke="#9ca3af" fontSize={12} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-          <Tooltip
-            contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
-            labelStyle={{ color: '#f3f4f6' }}
-            formatter={(value: number) => [`$${value.toLocaleString()}`, undefined]}
-          />
-          <Legend />
-          <Area type="monotone" dataKey="balance" stroke="#8b5cf6" fill="url(#colorBalance)" name="Balance" />
-          <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="url(#colorRevenue)" name="Revenue" />
-        </AreaChart>
-      </ResponsiveContainer>
+    <div className="bg-gray-800 rounded-xl border border-gray-700">
+      {/* Compact header — always visible */}
+      <div className="p-4">
+        <button
+          onClick={() => setExpanded(prev => !prev)}
+          className="w-full flex items-center justify-between text-left group"
+        >
+          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+            Cash Flow
+            <span className="text-xs font-normal text-gray-500">{forecast.scenario}</span>
+          </h2>
+          <span className="text-gray-500 group-hover:text-gray-300 transition-colors">
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </span>
+        </button>
+
+        {/* Compact numbers */}
+        <div className="mt-3 space-y-3">
+          {/* Runway bar */}
+          <div>
+            <div className="flex items-baseline justify-between mb-1">
+              <span className="text-xs text-gray-400">Runway</span>
+              <span className={`text-sm font-bold ${getRunwayTextColor(forecast.runwayDays)}`}>
+                {forecast.runwayDays > 3650 ? 'Indefinite' : `${forecast.runwayDays} days`}
+              </span>
+            </div>
+            <div className="w-full bg-gray-700 rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all ${getRunwayColor(forecast.runwayDays)}`}
+                style={{ width: `${runwayPercent(forecast.runwayDays)}%` }}
+              />
+            </div>
+            {forecast.runwayEndDate && forecast.runwayDays <= 3650 && (
+              <p className="text-xs text-gray-500 mt-1">
+                Ends {new Date(forecast.runwayEndDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+              </p>
+            )}
+          </div>
+
+          {/* Key numbers grid */}
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <p className="text-xs text-gray-500">Balance</p>
+              <p className="text-sm font-semibold text-white">
+                ${(forecast.cashBalance / 1000).toFixed(1)}K
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Revenue</p>
+              <p className="text-sm font-semibold text-emerald-400">
+                ${(forecast.monthlyRevenue / 1000).toFixed(1)}K/mo
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Burn</p>
+              <p className="text-sm font-semibold text-red-400">
+                ${(forecast.monthlyBurnRate / 1000).toFixed(1)}K/mo
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Expandable chart */}
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-gray-700 pt-4">
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={data}>
+              <defs>
+                <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis dataKey="date" stroke="#9ca3af" fontSize={11} />
+              <YAxis stroke="#9ca3af" fontSize={11} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', fontSize: '12px' }}
+                labelStyle={{ color: '#f3f4f6' }}
+                formatter={(value: number) => [`$${value.toLocaleString()}`, undefined]}
+              />
+              <Legend wrapperStyle={{ fontSize: '12px' }} />
+              <Area type="monotone" dataKey="balance" stroke="#8b5cf6" fill="url(#colorBalance)" name="Balance" />
+              <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="url(#colorRevenue)" name="Revenue" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 }

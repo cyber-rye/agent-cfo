@@ -92,7 +92,7 @@ export function AgentFeed({ decisions, typingIds }: AgentFeedProps) {
         <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
         Agent Activity
       </h2>
-      <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+      <div className="space-y-3 max-h-[700px] overflow-y-auto pr-1">
         {decisions.length === 0 ? (
           <p className="text-gray-500 text-sm">No decisions yet. Run an analysis to see agent reasoning.</p>
         ) : (

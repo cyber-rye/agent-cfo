@@ -262,14 +262,14 @@ export default function App() {
               />
             </div>
 
-            {/* Charts and Feed */}
+            {/* Agent Feed (primary) + Context sidebar */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
+              <div className="lg:col-span-2">
+                <AgentFeed decisions={decisions} typingIds={typingIds} />
+              </div>
+              <div className="space-y-4">
                 {forecast && <ForecastChart forecast={forecast} />}
                 {budgets.length > 0 && <BudgetStatus budgets={budgets} />}
-              </div>
-              <div>
-                <AgentFeed decisions={decisions} typingIds={typingIds} />
               </div>
             </div>
           </div>
