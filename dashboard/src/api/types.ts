@@ -94,3 +94,47 @@ export interface AuditEntry {
   createdAt: string;
   correlationId: string;
 }
+
+export interface SeedResponse {
+  organizationId: string;
+  profile: string;
+  organizationName: string;
+  transactionCount: number;
+  budgetCount: number;
+  decisionCount: number;
+  message: string;
+}
+
+export interface ProfileOption {
+  value: string;
+  label: string;
+  tagline: string;
+  description: string;
+}
+
+export const PROFILES: ProfileOption[] = [
+  {
+    value: 'growth-saas',
+    label: 'NovaCRM',
+    tagline: 'Growth SaaS · $23K MRR · Healthy',
+    description: 'B2B SaaS with 12% MoM growth. 14+ months runway. Agent recommends strategic investments.',
+  },
+  {
+    value: 'cash-crunch',
+    label: 'ByteStack',
+    tagline: 'Cash Crunch · $5.4K MRR · 3mo Runway',
+    description: 'Dev tools startup with declining revenue. Agent flags urgent cost cuts needed.',
+  },
+  {
+    value: 'hypergrowth',
+    label: 'LaunchPad AI',
+    tagline: 'Hypergrowth · $52K MRR · 6mo Runway',
+    description: 'AI platform growing 22% MoM. High burn rate. Agent warns about Series B timing.',
+  },
+  {
+    value: 'pre-seed',
+    label: 'FreshStack',
+    tagline: 'Pre-Seed · $1.1K MRR · Solo Founder',
+    description: 'Bootstrapped solo founder. First paying customers. Agent guides every dollar.',
+  },
+];

@@ -1,7 +1,7 @@
 import type {
   DashboardSummary, ForecastResponse, RevenueMetrics,
   BudgetResponse, AgentDecision, ExpenseEvaluation,
-  ExpenseRecordResult, AuditEntry,
+  ExpenseRecordResult, AuditEntry, SeedResponse,
 } from './types';
 
 const BASE = '/api';
@@ -59,5 +59,6 @@ export const api = {
     get<AuditEntry[]>(`/agent/${orgId}/audit?limit=${limit}`),
 
   // Seed
-  seedDemo: () => post<{ organizationId: string }>('/seed/demo'),
+  seedDemo: (profile?: string) =>
+    post<SeedResponse>(`/seed/demo${profile ? `?profile=${encodeURIComponent(profile)}` : ''}`),
 };

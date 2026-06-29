@@ -42,19 +42,44 @@ public class ForecastService : IForecastService
         var allTimeExpenses = await _transactionRepo.GetTotalExpensesAsync(organizationId, DateTime.MinValue, now, ct);
         var cashBalance = allTimeRevenue.Subtract(allTimeExpenses);
 
+        // Apply scenario adjustments to monthly figures
+        var adjustedRevenue = currentMonthRevenue;
+        var adjustedExpenses = currentMonthExpenses;
+        var scenarioLabel = scenario ?? "base";
+
+        switch (scenarioLabel)
+        {
+            case "hire-2-engineers":
+                // Two senior engineers at ~$10K/mo each
+                adjustedExpenses = Money.From(currentMonthExpenses.Amount + 20_000m, currentMonthExpenses.Currency);
+                break;
+            case "hire-1-engineer":
+                // One senior engineer
+                adjustedExpenses = Money.From(currentMonthExpenses.Amount + 10_000m, currentMonthExpenses.Currency);
+                break;
+            case "expand-mrr-15":
+                // 15% MRR growth from new customers
+                adjustedRevenue = Money.From(currentMonthRevenue.Amount * 1.15m, currentMonthRevenue.Currency);
+                break;
+            case "cut-marketing-50":
+                // Cut marketing spend in half (~$2K/mo for a startup this size)
+                adjustedExpenses = Money.From(currentMonthExpenses.Amount - 2_000m, currentMonthExpenses.Currency);
+                break;
+        }
+
         // Growth-adjusted revenue projection
         var growthRate = previousMonthRevenue.IsZero
             ? 0
             : (currentMonthRevenue.Amount - previousMonthRevenue.Amount) / previousMonthRevenue.Amount;
 
         var forecast = Forecast.Create(
-            organizationId, cashBalance, currentMonthExpenses, currentMonthRevenue,
-            ForecastSource.Agent, scenario);
+            organizationId, cashBalance, adjustedExpenses, adjustedRevenue,
+            ForecastSource.Agent, scenarioLabel);
 
         // Generate 3-month projection with growth
         var balance = cashBalance;
-        var projectedRevenue = currentMonthRevenue;
-        var projectedExpenses = currentMonthExpenses;
+        var projectedRevenue = adjustedRevenue;
+        var projectedExpenses = adjustedExpenses;
 
         for (int i = 1; i <= 3; i++)
         {
@@ -72,4 +97,3 @@ public class ForecastService : IForecastService
         return forecast;
     }
 }
-

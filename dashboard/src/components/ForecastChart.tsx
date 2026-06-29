@@ -29,11 +29,12 @@ function runwayPercent(days: number): number {
 
 interface ForecastChartProps {
   forecast: ForecastResponse;
+  selectedScenario?: string;
   onScenarioChange?: (scenario: string) => void;
   scenarioLoading?: boolean;
 }
 
-export function ForecastChart({ forecast, onScenarioChange, scenarioLoading }: ForecastChartProps) {
+export function ForecastChart({ forecast, selectedScenario, onScenarioChange, scenarioLoading }: ForecastChartProps) {
   const [expanded, setExpanded] = useState(false);
 
   const data = forecast.projections.map(p => ({
@@ -69,8 +70,8 @@ export function ForecastChart({ forecast, onScenarioChange, scenarioLoading }: F
         {/* Scenario selector */}
         {onScenarioChange && (
           <div className="mt-2">
-            <select
-              value={forecast.scenario}
+              <select
+              value={selectedScenario ?? forecast.scenario}
               onChange={e => onScenarioChange(e.target.value)}
               disabled={scenarioLoading}
               className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-xs text-gray-300

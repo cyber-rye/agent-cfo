@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Zap, DollarSign, WifiOff } from 'lucide-react';
 import { api } from './api/client';
 import type { DashboardSummary, ForecastResponse, RevenueMetrics, BudgetResponse, AgentDecision } from './api/types';
+import { PROFILES } from './api/types';
 import { MetricCard } from './components/MetricCard';
 import { AgentFeed } from './components/AgentFeed';
 import { QuickActions } from './components/QuickActions';
@@ -23,6 +24,9 @@ export default function App() {
   });
   const [loading, setLoading] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState('growth-saas');
+  const [activeProfile, setActiveProfile] = useState<string | null>(() => localStorage.getItem('agentcfo_profile'));
   const [analyzing, setAnalyzing] = useState(false);
   const [typingIds, setTypingIds] = useState<Set<string>>(new Set());
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
@@ -33,6 +37,7 @@ export default function App() {
   const [budgets, setBudgets] = useState<BudgetResponse[]>([]);
   const [decisions, setDecisions] = useState<AgentDecision[]>([]);
   const [scenarioLoading, setScenarioLoading] = useState(false);
+  const [selectedScenario, setSelectedScenario] = useState('base');
   const { toasts, addToast, dismissToast } = useToasts();
 
   const loadData = useCallback(async (id: string) => {
@@ -72,14 +77,18 @@ export default function App() {
     if (orgId) loadData(orgId);
   }, [orgId, loadData]);
 
-  const handleSeed = async () => {
+  const handleSeed = async (profile?: string) => {
     setSeeding(true);
+    setConfirmReset(false);
     setApiError(false);
     try {
-      const result = await api.seedDemo();
+      const result = await api.seedDemo(profile ?? selectedProfile);
       localStorage.setItem(ORG_KEY, result.organizationId);
+      localStorage.setItem('agentcfo_profile', result.profile);
       setOrgId(result.organizationId);
-      addToast('ReportGenerated', 'Demo Data Loaded', '90 transactions, 5 budgets, 4 agent decisions');
+      setActiveProfile(result.profile);
+      setSelectedScenario('base');
+      addToast('ReportGenerated', `${result.organizationName} Loaded`, result.message);
     } catch (err) {
       console.error('Seed failed:', err);
       setApiError(true);
@@ -88,29 +97,31 @@ export default function App() {
     }
   };
 
+  const handleSeedButtonClick = () => {
+    if (!orgId) {
+      // No data yet — seed directly
+      handleSeed();
+    } else if (!confirmReset) {
+      // Data exists — first click: show confirm
+      setConfirmReset(true);
+      // Auto-dismiss after 5 seconds
+      setTimeout(() => setConfirmReset(false), 5000);
+    } else {
+      // Second click: actually reset
+      handleSeed();
+    }
+  };
+
   const handleAnalyze = async () => {
     if (!orgId) return;
     setAnalyzing(true);
     setAgentStatus('analyzing');
     try {
-      // Save current IDs before analysis
       const currentIds = new Set(decisions.map(d => d.id));
-      
       await api.runFullAnalysis(orgId);
       await loadData(orgId);
-
-      // Find new decision IDs (not in the previous set)
       const updatedDecisions = await api.getDecisions(orgId, 10);
-      const newIds = new Set(
-        updatedDecisions.filter(d => !currentIds.has(d.id)).map(d => d.id)
-      );
-      setTypingIds(newIds);
-
-      // Show toasts for new decisions
-      const newOnes = updatedDecisions.filter(d => newIds.has(d.id));
-      for (const d of newOnes.slice(0, 3)) {
-        addToast(d.type, d.description, d.reasoning.slice(0, 100) + '...');
-      }
+      applyNewDecisions(currentIds, updatedDecisions);
 
       const hasAlerts = updatedDecisions.some(d => d.type === 'AnomalyDetected' || d.type === 'AlertRaised');
       setAgentStatus(hasAlerts ? 'alert' : 'idle');
@@ -122,8 +133,21 @@ export default function App() {
     }
   };
 
+  const applyNewDecisions = (currentIds: Set<string>, updatedDecisions: AgentDecision[]) => {
+    const newIds = new Set(
+      updatedDecisions.filter(d => !currentIds.has(d.id)).map(d => d.id)
+    );
+    setTypingIds(newIds);
+
+    const newOnes = updatedDecisions.filter(d => newIds.has(d.id));
+    for (const d of newOnes.slice(0, 3)) {
+      addToast(d.type, d.description, d.reasoning.slice(0, 100) + '...');
+    }
+  };
+
   const handleScenarioChange = async (scenario: string) => {
     if (!orgId) return;
+    setSelectedScenario(scenario);
     setScenarioLoading(true);
     try {
       const fc = await api.getForecast(orgId, scenario);
@@ -137,14 +161,15 @@ export default function App() {
 
   const handleQuickActionComplete = async () => {
     if (!orgId) return;
-    // Refresh decisions and forecast after a quick action
     try {
+      const currentIds = new Set(decisions.map(d => d.id));
       const [dec, fc] = await Promise.all([
         api.getDecisions(orgId, 10),
         api.getForecast(orgId),
       ]);
       setDecisions(dec);
       setForecast(fc);
+      applyNewDecisions(currentIds, dec);
     } catch (err) {
       console.error('Refresh after quick action failed:', err);
     }
@@ -215,31 +240,34 @@ export default function App() {
               <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
             </button>
             <button
-              onClick={handleSeed}
+              onClick={handleSeedButtonClick}
               disabled={seeding}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 rounded-lg text-sm font-medium border border-gray-700 transition-colors"
+              className={`px-4 py-2 disabled:opacity-50 rounded-lg text-sm font-medium border transition-colors ${
+                confirmReset
+                  ? 'bg-red-600 hover:bg-red-700 border-red-500 text-white'
+                  : 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-white'
+              }`}
             >
-              {seeding ? 'Seeding...' : 'Seed Demo Data'}
+              {seeding ? 'Seeding...' : confirmReset ? 'Confirm Reset?' : 'Seed Demo Data'}
             </button>
           </div>
         </div>
 
         {/* Founder persona banner */}
-        {orgId && dashboard && (
-          <div className="border-t border-gray-800/50 bg-gray-900/60">
-            <div className="max-w-7xl mx-auto px-6 py-2 flex items-center gap-4 text-xs text-gray-500">
-              <span className="text-gray-400 font-medium">Acme SaaS</span>
-              <span>·</span>
-              <span>Founded 2025</span>
-              <span>·</span>
-              <span>Solo Founder</span>
-              <span>·</span>
-              <span>3 Employees</span>
-              <span>·</span>
-              <span>{revenue ? formatMoney(revenue.monthlyRecurringRevenue) + ' MRR' : '—'}</span>
+        {orgId && dashboard && (() => {
+          const profile = PROFILES.find(p => p.value === activeProfile);
+          return (
+            <div className="border-t border-gray-800/50 bg-gray-900/60">
+              <div className="max-w-7xl mx-auto px-6 py-2 flex items-center gap-4 text-xs text-gray-500">
+                <span className="text-gray-400 font-medium">{profile?.label ?? 'Demo'}</span>
+                <span>·</span>
+                <span>{profile?.tagline ?? ''}</span>
+                <span>·</span>
+                <span>{revenue ? formatMoney(revenue.monthlyRecurringRevenue) + ' MRR' : '—'}</span>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </header>
 
       {/* Content */}
@@ -251,15 +279,36 @@ export default function App() {
             </div>
             <h2 className="text-2xl font-bold">Welcome to AgentCFO</h2>
             <p className="text-gray-400 max-w-md text-center">
-              An autonomous financial agent for startups. It watches your Stripe revenue,
-              enforces your budget, forecasts your runway, and makes decisions with reasoning.
+              An autonomous financial agent for startups. Choose a startup profile to explore.
             </p>
+
+            {/* Profile selector */}
+            <div className="w-full max-w-md space-y-2">
+              {PROFILES.map(p => (
+                <button
+                  key={p.value}
+                  onClick={() => setSelectedProfile(p.value)}
+                  className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
+                    selectedProfile === p.value
+                      ? 'bg-violet-600/20 border-violet-500 text-white'
+                      : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold">{p.label}</span>
+                    <span className="text-xs text-gray-500">{p.tagline}</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{p.description}</p>
+                </button>
+              ))}
+            </div>
+
             <button
-              onClick={handleSeed}
+              onClick={() => handleSeed()}
               disabled={seeding}
               className="px-6 py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
             >
-              {seeding ? 'Seeding...' : 'Seed Demo Data'}
+              {seeding ? 'Seeding...' : `Load ${PROFILES.find(p => p.value === selectedProfile)?.label ?? 'Demo'} Data`}
             </button>
           </div>
         ) : (
@@ -308,6 +357,7 @@ export default function App() {
                 {forecast && (
                   <ForecastChart
                     forecast={forecast}
+                    selectedScenario={selectedScenario}
                     onScenarioChange={handleScenarioChange}
                     scenarioLoading={scenarioLoading}
                   />
