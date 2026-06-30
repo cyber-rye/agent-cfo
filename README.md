@@ -57,10 +57,6 @@ An AI agent that *is* your CFO. It watches your Stripe transactions in real-time
 | **Payments** | Stripe (subscriptions, invoices, payment links) |
 | **Container** | Docker, Docker Compose |
 
-## Live Demo
-
-**https://agentcfo.ryeye.xyz/**
-
 ## Quick Start
 
 ```bash
