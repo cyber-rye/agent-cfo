@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Zap, DollarSign, WifiOff } from 'lucide-react';
 import { api } from './api/client';
 import type { DashboardSummary, ForecastResponse, RevenueMetrics, BudgetResponse, AgentDecision } from './api/types';
-import { PROFILES } from './api/types';
 import { MetricCard } from './components/MetricCard';
 import { AgentFeed } from './components/AgentFeed';
 import { QuickActions } from './components/QuickActions';
@@ -25,8 +24,6 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [selectedProfile, setSelectedProfile] = useState('growth-saas');
-  const [activeProfile, setActiveProfile] = useState<string | null>(() => localStorage.getItem('agentcfo_profile'));
   const [analyzing, setAnalyzing] = useState(false);
   const [typingIds, setTypingIds] = useState<Set<string>>(new Set());
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
@@ -77,38 +74,21 @@ export default function App() {
     if (orgId) loadData(orgId);
   }, [orgId, loadData]);
 
-  const handleSeed = async (profile?: string) => {
+  const handleSeed = async () => {
     setSeeding(true);
     setConfirmReset(false);
     setApiError(false);
     try {
-      const result = await api.seedDemo(profile ?? selectedProfile);
+      const result = await api.seedDemo();
       localStorage.setItem(ORG_KEY, result.organizationId);
-      localStorage.setItem('agentcfo_profile', result.profile);
       setOrgId(result.organizationId);
-      setActiveProfile(result.profile);
       setSelectedScenario('base');
-      addToast('ReportGenerated', `${result.organizationName} Loaded`, result.message);
+      addToast('ReportGenerated', 'Demo Data Loaded', 'NovaCRM — $22K MRR, cash-flow positive');
     } catch (err) {
       console.error('Seed failed:', err);
       setApiError(true);
     } finally {
       setSeeding(false);
-    }
-  };
-
-  const handleSeedButtonClick = () => {
-    if (!orgId) {
-      // No data yet — seed directly
-      handleSeed();
-    } else if (!confirmReset) {
-      // Data exists — first click: show confirm
-      setConfirmReset(true);
-      // Auto-dismiss after 5 seconds
-      setTimeout(() => setConfirmReset(false), 5000);
-    } else {
-      // Second click: actually reset
-      handleSeed();
     }
   };
 
@@ -240,7 +220,11 @@ export default function App() {
               <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
             </button>
             <button
-              onClick={handleSeedButtonClick}
+              onClick={() => {
+                if (!orgId) { handleSeed(); }
+                else if (!confirmReset) { setConfirmReset(true); setTimeout(() => setConfirmReset(false), 5000); }
+                else { handleSeed(); }
+              }}
               disabled={seeding}
               className={`px-4 py-2 disabled:opacity-50 rounded-lg text-sm font-medium border transition-colors ${
                 confirmReset
@@ -254,20 +238,17 @@ export default function App() {
         </div>
 
         {/* Founder persona banner */}
-        {orgId && dashboard && (() => {
-          const profile = PROFILES.find(p => p.value === activeProfile);
-          return (
-            <div className="border-t border-gray-800/50 bg-gray-900/60">
-              <div className="max-w-7xl mx-auto px-6 py-2 flex items-center gap-4 text-xs text-gray-500">
-                <span className="text-gray-400 font-medium">{profile?.label ?? 'Demo'}</span>
-                <span>·</span>
-                <span>{profile?.tagline ?? ''}</span>
-                <span>·</span>
-                <span>{revenue ? formatMoney(revenue.monthlyRecurringRevenue) + ' MRR' : '—'}</span>
-              </div>
+        {orgId && dashboard && (
+          <div className="border-t border-gray-800/50 bg-gray-900/60">
+            <div className="max-w-7xl mx-auto px-6 py-2 flex items-center gap-4 text-xs text-gray-500">
+              <span className="text-gray-400 font-medium">NovaCRM</span>
+              <span>·</span>
+              <span>B2B SaaS · Growing 10% MoM</span>
+              <span>·</span>
+              <span>{revenue ? formatMoney(revenue.monthlyRecurringRevenue) + ' MRR' : '—'}</span>
             </div>
-          );
-        })()}
+          </div>
+        )}
       </header>
 
       {/* Content */}
@@ -279,36 +260,15 @@ export default function App() {
             </div>
             <h2 className="text-2xl font-bold">Welcome to AgentCFO</h2>
             <p className="text-gray-400 max-w-md text-center">
-              An autonomous financial agent for startups. Choose a startup profile to explore.
+              An autonomous financial agent for startups. It watches your Stripe revenue,
+              enforces your budget, forecasts your runway, and makes decisions with reasoning.
             </p>
-
-            {/* Profile selector */}
-            <div className="w-full max-w-md space-y-2">
-              {PROFILES.map(p => (
-                <button
-                  key={p.value}
-                  onClick={() => setSelectedProfile(p.value)}
-                  className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
-                    selectedProfile === p.value
-                      ? 'bg-violet-600/20 border-violet-500 text-white'
-                      : 'bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold">{p.label}</span>
-                    <span className="text-xs text-gray-500">{p.tagline}</span>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">{p.description}</p>
-                </button>
-              ))}
-            </div>
-
             <button
               onClick={() => handleSeed()}
               disabled={seeding}
               className="px-6 py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
             >
-              {seeding ? 'Seeding...' : `Load ${PROFILES.find(p => p.value === selectedProfile)?.label ?? 'Demo'} Data`}
+              {seeding ? 'Seeding...' : 'Load Demo Data'}
             </button>
           </div>
         ) : (
