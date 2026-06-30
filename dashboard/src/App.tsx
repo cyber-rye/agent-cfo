@@ -10,6 +10,8 @@ import { ForecastChart } from './components/ForecastChart';
 import { BudgetStatus } from './components/BudgetStatus';
 import { AuditTrail } from './components/AuditTrail';
 import { GovernancePanel } from './components/GovernancePanel';
+import { FinancialSummary } from './components/FinancialSummary';
+import { StripeConnection } from './components/StripeConnection';
 import { ToastContainer, useToasts } from './components/Toast';
 
 const ORG_KEY = 'agentcfo_org_id';
@@ -25,8 +27,9 @@ export default function App() {
   const [seeding, setSeeding] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [typingIds, setTypingIds] = useState<Set<string>>(new Set());
+  const [newDecisionIds, setNewDecisionIds] = useState<Set<string>>(new Set());
   const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle');
+  const [analysisStep, setAnalysisStep] = useState<string | null>(null);
   const [apiError, setApiError] = useState(false);
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [forecast, setForecast] = useState<ForecastResponse | null>(null);
@@ -83,7 +86,11 @@ export default function App() {
       localStorage.setItem(ORG_KEY, result.organizationId);
       setOrgId(result.organizationId);
       setSelectedScenario('base');
-      addToast('ReportGenerated', 'Demo Data Loaded', 'NovaCRM — $22K MRR, cash-flow positive');
+      addToast('ReportGenerated', 'Stripe Data Loaded', 'NovaCRM — $22K MRR, 22 customers synced');
+      // Auto-trigger analysis after seed for instant "wow"
+      setTimeout(() => {
+        handleAnalyzeWithId(result.organizationId);
+      }, 500);
     } catch (err) {
       console.error('Seed failed:', err);
       setApiError(true);
@@ -92,17 +99,15 @@ export default function App() {
     }
   };
 
-  const handleAnalyze = async () => {
-    if (!orgId) return;
+  const handleAnalyzeWithId = async (id: string) => {
     setAnalyzing(true);
     setAgentStatus('analyzing');
     try {
       const currentIds = new Set(decisions.map(d => d.id));
-      await api.runFullAnalysis(orgId);
-      await loadData(orgId);
-      const updatedDecisions = await api.getDecisions(orgId, 10);
-      applyNewDecisions(currentIds, updatedDecisions);
-
+      await api.runFullAnalysis(id);
+      await loadData(id);
+      const updatedDecisions = await api.getDecisions(id, 10);
+      markNewDecisions(currentIds, updatedDecisions);
       const hasAlerts = updatedDecisions.some(d => d.type === 'AnomalyDetected' || d.type === 'AlertRaised');
       setAgentStatus(hasAlerts ? 'alert' : 'idle');
     } catch (err) {
@@ -113,17 +118,66 @@ export default function App() {
     }
   };
 
-  const applyNewDecisions = (currentIds: Set<string>, updatedDecisions: AgentDecision[]) => {
+  const handleAnalyze = async () => {
+    if (!orgId) return;
+    setAnalyzing(true);
+    setAgentStatus('analyzing');
+    setAnalysisStep('Detecting anomalies...');
+    try {
+      const currentIds = new Set(decisions.map(d => d.id));
+
+      // Step 1: Anomaly detection
+      await api.detectAnomalies(orgId);
+      setAnalysisStep('Generating forecast...');
+
+      // Step 2: Forecast
+      await api.generateForecast(orgId);
+      setAnalysisStep('Writing summary...');
+
+      // Step 3: Summary
+      await api.generateSummary(orgId);
+      setAnalysisStep(null);
+
+      // Fetch new decisions BEFORE refreshing all data
+      const updatedDecisions = await api.getDecisions(orgId, 10);
+      markNewDecisions(currentIds, updatedDecisions);
+
+      // Now refresh all data
+      await loadData(orgId);
+
+      const hasAlerts = updatedDecisions.some(d => d.type === 'AnomalyDetected' || d.type === 'AlertRaised');
+      setAgentStatus(hasAlerts ? 'alert' : 'idle');
+    } catch (err) {
+      console.error('Analysis failed:', err);
+    } finally {
+      setAnalyzing(false);
+      setAnalysisStep(null);
+      if (agentStatus === 'analyzing') setAgentStatus('idle');
+    }
+  };
+
+  const markNewDecisions = (currentIds: Set<string>, updatedDecisions: AgentDecision[]) => {
     const newIds = new Set(
       updatedDecisions.filter(d => !currentIds.has(d.id)).map(d => d.id)
     );
-    setTypingIds(newIds);
+    setNewDecisionIds(newIds);
 
     const newOnes = updatedDecisions.filter(d => newIds.has(d.id));
     for (const d of newOnes.slice(0, 3)) {
       addToast(d.type, d.description, d.reasoning.slice(0, 100) + '...');
     }
   };
+
+  // Keyboard shortcuts for demo recording
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      if (e.key === 'a' || e.key === 'A') { e.preventDefault(); handleAnalyze(); }
+      if (e.key === 'r' || e.key === 'R') { e.preventDefault(); if (orgId) loadData(orgId); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [orgId, handleAnalyze]);
 
   const handleScenarioChange = async (scenario: string) => {
     if (!orgId) return;
@@ -143,13 +197,19 @@ export default function App() {
     if (!orgId) return;
     try {
       const currentIds = new Set(decisions.map(d => d.id));
-      const [dec, fc] = await Promise.all([
+      const [dash, dec, fc, rev, bud] = await Promise.all([
+        api.getDashboard(orgId),
         api.getDecisions(orgId, 10),
         api.getForecast(orgId),
+        api.getRevenueMetrics(orgId),
+        api.getBudgets(orgId),
       ]);
+      setDashboard(dash);
       setDecisions(dec);
       setForecast(fc);
-      applyNewDecisions(currentIds, dec);
+      setRevenue(rev);
+      setBudgets(bud);
+      markNewDecisions(currentIds, dec);
     } catch (err) {
       console.error('Refresh after quick action failed:', err);
     }
@@ -191,7 +251,8 @@ export default function App() {
               <DollarSign size={18} />
             </div>
             <h1 className="text-xl font-bold tracking-tight">AgentCFO</h1>
-            <span className="text-xs text-gray-500 border border-gray-700 rounded px-2 py-0.5">Autonomous Financial Agent</span>
+            <span className="text-xs text-gray-500 border border-gray-700 rounded px-2 py-0.5">AI CFO for Startups</span>
+            <span className="hidden lg:inline text-xs text-gray-600 ml-2">Powered by <span className="text-violet-400">Hermes</span> · <span className="text-green-400">NemoClaw</span> · <span className="text-purple-400">Stripe</span></span>
           </div>
           <div className="flex items-center gap-3">
             {/* Agent status indicator */}
@@ -208,7 +269,7 @@ export default function App() {
                 className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
               >
                 <Zap size={14} className={analyzing ? 'animate-spin' : ''} />
-                {analyzing ? 'Analyzing...' : 'Run Analysis'}
+                {analyzing ? (analysisStep || 'Analyzing...') : 'Run Analysis'}
               </button>
             )}
             <button
@@ -232,7 +293,7 @@ export default function App() {
                   : 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-white'
               }`}
             >
-              {seeding ? 'Seeding...' : confirmReset ? 'Confirm Reset?' : 'Seed Demo Data'}
+              {seeding ? 'Seeding...' : confirmReset ? 'Confirm Reset?' : 'Reset Stripe Data'}
             </button>
           </div>
         </div>
@@ -260,16 +321,29 @@ export default function App() {
             </div>
             <h2 className="text-2xl font-bold">Welcome to AgentCFO</h2>
             <p className="text-gray-400 max-w-md text-center">
-              An autonomous financial agent for startups. It watches your Stripe revenue,
-              enforces your budget, forecasts your runway, and makes decisions with reasoning.
+              An autonomous financial agent powered by <span className="text-violet-400 font-medium">Hermes</span>,
+              running in <span className="text-green-400 font-medium">NVIDIA NemoClaw</span>,
+              connected to <span className="text-purple-400 font-medium">Stripe</span>.
+            </p>
+            <p className="text-gray-500 text-sm max-w-lg text-center">
+              It watches your revenue, enforces your budget, forecasts your runway,
+              and makes decisions with reasoning — all in a sandboxed environment with guardrails.
             </p>
             <button
               onClick={() => handleSeed()}
               disabled={seeding}
               className="px-6 py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 rounded-lg text-sm font-medium transition-colors"
             >
-              {seeding ? 'Seeding...' : 'Load Demo Data'}
+              {seeding ? 'Loading...' : 'Connect & Load Stripe Data'}
             </button>
+            <div className="flex items-center gap-4 mt-2">
+              <span className="text-xs text-gray-600">Powered by</span>
+              <span className="text-xs text-gray-500 font-medium">Hermes Agent</span>
+              <span className="text-xs text-gray-600">·</span>
+              <span className="text-xs text-gray-500 font-medium">NVIDIA NemoClaw</span>
+              <span className="text-xs text-gray-600">·</span>
+              <span className="text-xs text-gray-500 font-medium">Stripe</span>
+            </div>
           </div>
         ) : (
           <div className="space-y-6">
@@ -307,13 +381,14 @@ export default function App() {
             {/* Agent Feed (primary) + Quick Actions + Expense Evaluator + Context sidebar */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-4">
-                <AgentFeed decisions={decisions} typingIds={typingIds} />
+                <AgentFeed decisions={decisions} analyzing={analyzing} analysisStep={analysisStep} newDecisionIds={newDecisionIds} />
                 <div className="space-y-3">
                   <QuickActions orgId={orgId} onComplete={handleQuickActionComplete} />
                   <ExpenseEvaluator orgId={orgId} onComplete={handleQuickActionComplete} />
                 </div>
               </div>
               <div className="space-y-4">
+                {orgId && <StripeConnection orgId={orgId} />}
                 {forecast && (
                   <ForecastChart
                     forecast={forecast}
@@ -323,6 +398,7 @@ export default function App() {
                   />
                 )}
                 {budgets.length > 0 && <BudgetStatus budgets={budgets} />}
+                {orgId && <FinancialSummary orgId={orgId} />}
                 <AuditTrail orgId={orgId} />
                 <GovernancePanel />
               </div>

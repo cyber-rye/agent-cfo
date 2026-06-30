@@ -95,6 +95,10 @@ export interface AuditEntry {
   correlationId: string;
 }
 
+export interface SummaryResponse {
+  summary: string;
+}
+
 export interface SeedResponse {
   organizationId: string;
   profile: string;

@@ -26,9 +26,16 @@ public static class DependencyInjection
 
         // Services
         services.AddScoped<StripeWebhookService>();
+        services.AddScoped<StripeIntegrationService>();
         services.AddScoped<IRevenueMetricsService, RevenueMetricsService>();
         services.AddScoped<IForecastService, ForecastService>();
         services.AddScoped<IAgentService, AgentService>();
+
+        // LLM — OpenRouter (Nemotron 3 Ultra, free tier)
+        services.AddHttpClient<ILlmService, OpenRouterLlmService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(8);
+        });
 
         return services;
     }

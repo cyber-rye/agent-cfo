@@ -44,6 +44,12 @@ public class Organization : BaseEntity
         MarkUpdated();
     }
     
+    public void UpdateStripeCustomerId(string customerId)
+    {
+        StripeCustomerId = customerId;
+        MarkUpdated();
+    }
+    
     public void UpdateBudget(Money monthlyBudget)
     {
         MonthlyBudget = monthlyBudget;

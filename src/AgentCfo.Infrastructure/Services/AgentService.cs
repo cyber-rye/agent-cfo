@@ -8,9 +8,8 @@ namespace AgentCfo.Infrastructure.Services;
 
 /// <summary>
 /// Agent service that analyzes financial data and generates decisions.
-/// Uses actual financial data to produce reasoning-backed decisions.
-/// In production, this would call an LLM; for the hackathon demo,
-/// it uses deterministic analysis that produces compelling output.
+/// Uses Nemotron 3 Ultra (via OpenRouter) for natural-language reasoning,
+/// with deterministic fallback when LLM is unavailable.
 /// </summary>
 public class AgentService : IAgentService
 {
@@ -21,7 +20,17 @@ public class AgentService : IAgentService
     private readonly IAgentDecisionRepository _decisionRepo;
     private readonly IOrganizationRepository _orgRepo;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILlmService _llm;
     private readonly ILogger<AgentService> _logger;
+
+    private const string CFO_SYSTEM_PROMPT = """
+        You are AgentCFO, an autonomous financial operations agent for a startup.
+        You analyze financial data, detect anomalies, evaluate expenses, and generate reports.
+        Be specific — reference actual numbers, percentages, and trends.
+        Be concise — 2-4 sentences max for evaluations, longer for summaries.
+        Be direct — state your recommendation clearly (APPROVED/DENY/WARNING/OK).
+        Format currency as $X,XXX. Use plain text, no markdown headers.
+        """;
 
     public AgentService(
         ITransactionRepository transactionRepo,
@@ -31,6 +40,7 @@ public class AgentService : IAgentService
         IAgentDecisionRepository decisionRepo,
         IOrganizationRepository orgRepo,
         IUnitOfWork unitOfWork,
+        ILlmService llm,
         ILogger<AgentService> logger)
     {
         _transactionRepo = transactionRepo;
@@ -40,6 +50,7 @@ public class AgentService : IAgentService
         _decisionRepo = decisionRepo;
         _orgRepo = orgRepo;
         _unitOfWork = unitOfWork;
+        _llm = llm;
         _logger = logger;
     }
 
@@ -51,65 +62,68 @@ public class AgentService : IAgentService
         var budgets = await _budgetRepo.GetByOrganizationAsync(transaction.OrganizationId, ct);
         var relevantBudget = budgets.FirstOrDefault(b => b.Category == transaction.Category);
 
-        // Determine if this transaction warrants a decision
-        AgentDecision decision;
+        // Build context for LLM
+        var budgetContext = relevantBudget is not null
+            ? $"Category budget: {relevantBudget.MonthlyLimit}, current spend: {relevantBudget.CurrentSpend} ({relevantBudget.PercentUsed:F0}% used), hard limit: {relevantBudget.HardLimit}."
+            : $"No specific budget for {transaction.Category}.";
 
+        var userPrompt = $"""
+            Transaction: {transaction.Type} of {transaction.Amount} for '{transaction.Description}'
+            Category: {transaction.Category}
+            {budgetContext}
+            
+            Evaluate this transaction. Should it be approved or flagged? Explain briefly.
+            """;
+
+        // Try LLM first, fall back to deterministic
+        var reasoning = await _llm.TryCompleteAsync(CFO_SYSTEM_PROMPT, userPrompt, ct);
+
+        AgentDecision decision;
         if (transaction.Type == TransactionType.Revenue)
         {
+            var llmReasoning = reasoning ?? $"New {transaction.Type} of {transaction.Amount} received. Description: {transaction.Description}. This transaction has been categorized as {transaction.Category}. Revenue metrics will be updated on the next forecast cycle.";
             decision = AgentDecision.Propose(
                 transaction.OrganizationId,
                 AgentDecisionType.ForecastUpdated,
                 $"Revenue event recorded: {transaction.Amount}",
-                $"New {transaction.Type} of {transaction.Amount} received. " +
-                $"Description: {transaction.Description}. " +
-                $"This transaction has been categorized as {transaction.Category}. " +
-                $"Revenue metrics will be updated on the next forecast cycle.",
+                llmReasoning,
                 transaction.Id);
         }
         else if (transaction.Type == TransactionType.Expense)
         {
-            // Check against budget
             if (relevantBudget is not null && relevantBudget.HardLimit && !relevantBudget.CanSpend(transaction.Amount))
             {
+                var llmReasoning = reasoning ?? $"Evaluating expense: {transaction.Amount} for '{transaction.Description}'. {transaction.Category} budget: {relevantBudget.MonthlyLimit}, current spend: {relevantBudget.CurrentSpend} ({relevantBudget.PercentUsed:F0}% used). This expense would exceed the hard limit. Recommend: DENY.";
                 decision = AgentDecision.Propose(
                     transaction.OrganizationId,
                     AgentDecisionType.ExpenseDenied,
                     $"Expense exceeds {transaction.Category} budget",
-                    $"Evaluating expense: {transaction.Amount} for '{transaction.Description}'. " +
-                    $"{transaction.Category} budget: {relevantBudget.MonthlyLimit}, " +
-                    $"current spend: {relevantBudget.CurrentSpend} ({relevantBudget.PercentUsed:F0}% used). " +
-                    $"This expense would exceed the hard limit. Recommend: DENY. " +
-                    $"Suggestion: Review if this expense can be deferred to next period or renegotiated.",
+                    llmReasoning,
                     transaction.Id,
                     relevantBudget.Id);
             }
             else if (relevantBudget is not null && relevantBudget.IsNearLimit)
             {
+                var llmReasoning = reasoning ?? $"Evaluating expense: {transaction.Amount} for '{transaction.Description}'. {transaction.Category} budget: {relevantBudget.MonthlyLimit}, current spend: {relevantBudget.CurrentSpend} ({relevantBudget.PercentUsed:F0}% used). APPROVED, but note: this category is approaching its limit. Remaining budget after this expense: {relevantBudget.Remaining.Subtract(transaction.Amount)}.";
                 decision = AgentDecision.Propose(
                     transaction.OrganizationId,
                     AgentDecisionType.ExpenseApproved,
                     $"Expense approved with budget warning for {transaction.Category}",
-                    $"Evaluating expense: {transaction.Amount} for '{transaction.Description}'. " +
-                    $"{transaction.Category} budget: {relevantBudget.MonthlyLimit}, " +
-                    $"current spend: {relevantBudget.CurrentSpend} ({relevantBudget.PercentUsed:F0}% used). " +
-                    $"APPROVED, but note: this category is approaching its limit. " +
-                    $"Remaining budget after this expense: {relevantBudget.Remaining.Subtract(transaction.Amount)}. " +
-                    $"Recommend reviewing upcoming {transaction.Category} expenses.",
+                    llmReasoning,
                     transaction.Id,
                     relevantBudget.Id);
             }
             else
             {
+                var llmReasoning = reasoning ?? $"Evaluating expense: {transaction.Amount} for '{transaction.Description}'. " +
+                    (relevantBudget is not null
+                        ? $"{transaction.Category} budget: {relevantBudget.MonthlyLimit}, current utilization: {relevantBudget.PercentUsed:F0}%. Well within limits. APPROVED."
+                        : $"No specific budget for {transaction.Category}. APPROVED under general policy.");
                 decision = AgentDecision.Propose(
                     transaction.OrganizationId,
                     AgentDecisionType.ExpenseApproved,
                     $"Expense approved: {transaction.Description}",
-                    $"Evaluating expense: {transaction.Amount} for '{transaction.Description}'. " +
-                    (relevantBudget is not null
-                        ? $"{transaction.Category} budget: {relevantBudget.MonthlyLimit}, " +
-                          $"current utilization: {relevantBudget.PercentUsed:F0}%. " +
-                          $"Well within limits. APPROVED."
-                        : $"No specific budget for {transaction.Category}. APPROVED under general policy."),
+                    llmReasoning,
                     transaction.Id);
             }
         }
@@ -119,8 +133,7 @@ public class AgentService : IAgentService
                 transaction.OrganizationId,
                 AgentDecisionType.ForecastUpdated,
                 $"Transaction processed: {transaction.Type}",
-                $"Transaction of type {transaction.Type} for {transaction.Amount} processed. " +
-                $"No action required beyond recording.",
+                reasoning ?? $"Transaction of type {transaction.Type} for {transaction.Amount} processed. No action required beyond recording.",
                 transaction.Id);
         }
 
@@ -142,7 +155,7 @@ public class AgentService : IAgentService
         var totalSpend = budgets.Sum(b => b.CurrentSpend.Amount);
         var expenseRatio = totalBudget > 0 ? (amount.Amount / totalBudget * 100) : 0;
 
-        // Check per-category budget — infer category from description
+        // Find matching budget category
         var descLower = description.ToLower();
         Budget? matchingBudget = null;
         foreach (var budget in budgets)
@@ -160,44 +173,68 @@ public class AgentService : IAgentService
             }
         }
 
-        // Deny if: >20% of total budget OR would exceed category budget
         bool wouldExceedCategory = matchingBudget is not null &&
             (matchingBudget.CurrentSpend.Add(amount)).IsGreaterThan(matchingBudget.MonthlyLimit);
+        bool isDenied = expenseRatio > 20 || wouldExceedCategory;
+
+        // Build rich context for LLM — include the DECISION so reasoning aligns
+        var budgetSummary = string.Join("\n", budgets.Select(b =>
+            $"- {b.Category}: {b.CurrentSpend}/{b.MonthlyLimit} ({b.PercentUsed:F0}% used) {(b.HardLimit ? "[HARD LIMIT]" : "[soft]")}"));
+
+        var denialReason = isDenied
+            ? expenseRatio > 20
+                ? $"This expense is {expenseRatio:F0}% of total monthly budget, exceeding the 20% threshold."
+                : $"Would exceed {matchingBudget!.Category} budget: {matchingBudget.CurrentSpend} + {amount} > {matchingBudget.MonthlyLimit}."
+            : "";
+
+        var categoryNote = matchingBudget is not null
+            ? $"{matchingBudget.Category} budget after expense: {matchingBudget.CurrentSpend.Add(amount)} / {matchingBudget.MonthlyLimit}."
+            : "No specific category budget matched.";
+
+        var userPrompt = $"""
+            Expense request: {amount} for '{description}'
+            Decision: {(isDenied ? "DENIED" : "APPROVED")}
+            Reason: {denialReason}
+            
+            Financial context:
+            - MRR: {metrics?.MonthlyRecurringRevenue ?? Money.Zero()}
+            - Total monthly budget: {Money.From(totalBudget, amount.Currency)}
+            - Total current spend: {Money.From(totalSpend, amount.Currency)}
+            - This expense as % of total budget: {expenseRatio:F1}%
+            - {categoryNote}
+            
+            Budget breakdown:
+            {budgetSummary}
+            
+            Explain this decision in 2-3 sentences. Start with "APPROVED" or "DENY" and explain why.
+            """;
+
+        var reasoning = await _llm.TryCompleteAsync(CFO_SYSTEM_PROMPT, userPrompt, ct);
 
         AgentDecision decision;
-
-        if (expenseRatio > 20 || wouldExceedCategory)
+        if (isDenied)
         {
             var reason = expenseRatio > 20
                 ? $"This represents {expenseRatio:F0}% of total monthly budget ({Money.From(totalBudget, amount.Currency)})."
                 : $"Would exceed {matchingBudget!.Category} budget: current spend {matchingBudget.CurrentSpend} + {amount} > limit {matchingBudget.MonthlyLimit}.";
 
+            var llmReasoning = reasoning ?? $"Evaluating expense request: {amount} for '{description}'. {reason} Current total spend: {Money.From(totalSpend, amount.Currency)}. Monthly recurring revenue: {metrics?.MonthlyRecurringRevenue ?? Money.Zero()}. DENY — budget constraint violated. Recommend: Reduce scope, negotiate pricing, or wait until next budget cycle.";
+
             decision = AgentDecision.Propose(
                 organizationId,
                 AgentDecisionType.ExpenseDenied,
                 $"Expense request denied: {amount} for {description}",
-                $"Evaluating expense request: {amount} for '{description}'. " +
-                $"{reason} " +
-                $"Current total spend: {Money.From(totalSpend, amount.Currency)}. " +
-                $"Monthly recurring revenue: {metrics?.MonthlyRecurringRevenue ?? Money.Zero()}. " +
-                $"DENY — budget constraint violated. " +
-                $"Recommend: Reduce scope, negotiate pricing, or wait until next budget cycle.");
+                llmReasoning);
         }
         else
         {
-            var categoryNote = matchingBudget is not null
-                ? $"{matchingBudget.Category} budget impact: {matchingBudget.CurrentSpend.Add(amount)} / {matchingBudget.MonthlyLimit}."
-                : "No specific category budget matched — within total budget.";
+            var llmReasoning = reasoning ?? $"Evaluating expense request: {amount} for '{description}'. Budget impact: {expenseRatio:F1}% of total monthly budget. {categoryNote} MRR: {metrics?.MonthlyRecurringRevenue ?? Money.Zero()}. APPROVED — within budget constraints.";
 
             decision = AgentDecision.Propose(
                 organizationId,
                 AgentDecisionType.ExpenseApproved,
                 $"Expense request approved: {description}",
-                $"Evaluating expense request: {amount} for '{description}'. " +
-                $"Budget impact: {expenseRatio:F1}% of total monthly budget. " +
-                $"{categoryNote} " +
-                $"MRR: {metrics?.MonthlyRecurringRevenue ?? Money.Zero()}. " +
-                $"APPROVED — within budget constraints.");
+                llmReasoning);
         }
 
         await _decisionRepo.AddAsync(decision, ct);
@@ -249,55 +286,64 @@ public class AgentService : IAgentService
 
         var budgets = await _budgetRepo.GetByOrganizationAsync(organizationId, ct);
 
-        // Check for anomalies
+        // Collect anomalies
         var anomalies = new List<string>();
-
-        // Check month-over-month expense growth
         if (!previousExpenses.IsZero)
         {
             var growthRate = ((currentExpenses.Amount - previousExpenses.Amount) / previousExpenses.Amount) * 100;
             if (growthRate > 15)
-            {
                 anomalies.Add($"Expenses grew {growthRate:F0}% month-over-month ({previousExpenses} → {currentExpenses})");
-            }
         }
-
-        // Check budget utilization
         foreach (var budget in budgets.Where(b => b.IsNearLimit))
-        {
             anomalies.Add($"{budget.Category} budget at {budget.PercentUsed:F0}% (threshold: {budget.AlertThresholdPercent}%)");
-        }
-
-        // Check for over-budget categories
         foreach (var budget in budgets.Where(b => b.IsOverBudget))
-        {
             anomalies.Add($"{budget.Category} OVER BUDGET by {budget.CurrentSpend.Subtract(budget.MonthlyLimit)}");
-        }
+
+        // Build context for LLM
+        var budgetBreakdown = string.Join("\n", budgets.Select(b =>
+            $"- {b.Category}: {b.CurrentSpend}/{b.MonthlyLimit} ({b.PercentUsed:F0}%)"));
+
+        var userPrompt = $"""
+            Anomaly detection scan for startup financials.
+            
+            Current month expenses: {currentExpenses}
+            Previous month expenses: {previousExpenses}
+            
+            Budget utilization:
+            {budgetBreakdown}
+            
+            Issues detected: {(anomalies.Any() ? string.Join("; ", anomalies) : "none")}
+            
+            {"Analyze these anomalies and recommend actions. Be specific about which categories need attention."}
+            """;
+
+        var reasoning = await _llm.TryCompleteAsync(CFO_SYSTEM_PROMPT, userPrompt, ct);
 
         AgentDecision decision;
-
         if (anomalies.Any())
         {
+            var templateReasoning = $"Anomaly detection scan completed. Issues found:\n" +
+                string.Join("\n", anomalies.Select((a, i) => $"  {i + 1}. {a}")) +
+                $"\n\nRecommendation: Review affected categories and consider adjusting budgets or spending patterns. " +
+                $"Current monthly expenses: {currentExpenses}. Previous month: {previousExpenses}.";
+
             decision = AgentDecision.Propose(
                 organizationId,
                 AgentDecisionType.AnomalyDetected,
                 $"Anomaly detected: {anomalies.Count} issue(s) found",
-                $"Anomaly detection scan completed. Issues found:\n" +
-                string.Join("\n", anomalies.Select((a, i) => $"  {i + 1}. {a}")) +
-                $"\n\nRecommendation: Review affected categories and consider adjusting budgets or spending patterns. " +
-                $"Current monthly expenses: {currentExpenses}. " +
-                $"Previous month: {previousExpenses}.");
+                reasoning ?? templateReasoning);
         }
         else
         {
+            var templateReasoning = $"Anomaly detection scan completed. No anomalies detected. " +
+                $"Current month expenses: {currentExpenses}. Previous month: {previousExpenses}. " +
+                $"All budgets within normal parameters. No action required.";
+
             decision = AgentDecision.Propose(
                 organizationId,
                 AgentDecisionType.ReportGenerated,
                 "Anomaly detection: all clear",
-                $"Anomaly detection scan completed. No anomalies detected. " +
-                $"Current month expenses: {currentExpenses}. " +
-                $"Previous month: {previousExpenses}. " +
-                $"All budgets within normal parameters. No action required.");
+                reasoning ?? templateReasoning);
         }
 
         await _decisionRepo.AddAsync(decision, ct);
@@ -316,7 +362,47 @@ public class AgentService : IAgentService
         var budgets = await _budgetRepo.GetByOrganizationAsync(organizationId, ct);
         var recentDecisions = await _decisionRepo.GetRecentAsync(organizationId, 5, ct);
 
-        var summary = $"""
+        // Build comprehensive context for LLM summary
+        var budgetBreakdown = string.Join("\n", budgets.Select(b =>
+            $"- {b.Category}: {b.CurrentSpend}/{b.MonthlyLimit} ({b.PercentUsed:F0}%)"));
+        var recentActivity = string.Join("\n", recentDecisions.Take(3).Select(d =>
+            $"- [{d.Type}] {d.Description}"));
+
+        var userPrompt = $"""
+            Generate a monthly financial summary for {org?.Name ?? "the company"}.
+            
+            Revenue:
+            - MRR: {metrics?.MonthlyRecurringRevenue}
+            - Previous month: {metrics?.PreviousMonthRevenue}
+            - Growth rate: {metrics?.GrowthRatePercent:F1}%
+            - Active subscriptions: {metrics?.ActiveSubscriptions}
+            - Avg revenue per user: {metrics?.AverageRevenuePerUser}
+            
+            Cash position:
+            - Balance: {forecast?.CurrentCashBalance}
+            - Monthly burn: {forecast?.MonthlyBurnRate}
+            - Monthly revenue: {forecast?.MonthlyRevenue}
+            - Runway: {forecast?.RunwayDays} days
+            - Confidence: {forecast?.Confidence}
+            
+            Budget status:
+            {budgetBreakdown}
+            
+            Recent agent activity:
+            {recentActivity}
+            
+            Write a concise executive summary (5-8 sentences). Include:
+            1. Overall financial health assessment
+            2. Key metrics and trends
+            3. Areas of concern (if any)
+            4. Specific recommendations
+            
+            Format as a markdown document with headers.
+            """;
+
+        var llmSummary = await _llm.TryCompleteAsync(CFO_SYSTEM_PROMPT, userPrompt, ct);
+
+        var summary = llmSummary ?? $"""
             # Financial Summary — {org?.Name ?? "Unknown Organization"}
             Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC
 
@@ -335,10 +421,10 @@ public class AgentService : IAgentService
             - Confidence: {forecast?.Confidence}
 
             ## Budget Status
-            {string.Join("\n", budgets.Select(b => $"- {b.Category}: {b.CurrentSpend}/{b.MonthlyLimit} ({b.PercentUsed:F0}%)"))}
+            {budgetBreakdown}
 
             ## Recent Agent Activity
-            {string.Join("\n", recentDecisions.Take(3).Select(d => $"- [{d.Type}] {d.Description}"))}
+            {recentActivity}
 
             ## Assessment
             {(forecast?.RunwayDays > 180

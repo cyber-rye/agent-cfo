@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { DollarSign, CheckCircle, XCircle, Loader2, Save } from 'lucide-react';
 import { api } from '../api/client';
 import type { ExpenseEvaluation, ExpenseRecordResult } from '../api/types';
-import { TypewriterText } from './TypewriterText';
 
 const CATEGORIES = [
   { value: 0, label: 'Subscription' },
@@ -28,7 +27,6 @@ export function ExpenseEvaluator({ orgId, onComplete }: { orgId: string; onCompl
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState(4); // default: Tools
   const [state, setState] = useState<EvalState>({ step: 'form' });
-  const [typingDone, setTypingDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleEvaluate = async () => {
@@ -37,7 +35,6 @@ export function ExpenseEvaluator({ orgId, onComplete }: { orgId: string; onCompl
 
     setState({ step: 'evaluating' });
     setError(null);
-    setTypingDone(false);
 
     try {
       const evaluation = await api.evaluateExpense(orgId, parsedAmount, description.trim());
@@ -70,7 +67,6 @@ export function ExpenseEvaluator({ orgId, onComplete }: { orgId: string; onCompl
     setDescription('');
     setCategory(4);
     setState({ step: 'form' });
-    setTypingDone(false);
     setError(null);
   };
 
@@ -78,7 +74,7 @@ export function ExpenseEvaluator({ orgId, onComplete }: { orgId: string; onCompl
     ? state.evaluation.type === 'ExpenseApproved'
     : false;
   const isRecording = state.step === 'recording';
-  const showRecordAction = isApproved && (state.step === 'result' || isRecording) && typingDone;
+  const showRecordAction = isApproved && (state.step === 'result' || isRecording);
 
   return (
     <div className="border border-gray-700 rounded-lg bg-gray-800/50">
@@ -86,6 +82,7 @@ export function ExpenseEvaluator({ orgId, onComplete }: { orgId: string; onCompl
       <div className="px-4 py-3 border-b border-gray-700 flex items-center gap-2">
         <DollarSign size={16} className="text-violet-400" />
         <span className="text-sm font-semibold text-white">Ask the Agent</span>
+        <span className="text-[10px] text-gray-500 ml-1">Expense governance</span>
         {state.step !== 'form' && state.step !== 'evaluating' && (
           <button
             onClick={handleReset}
@@ -144,7 +141,7 @@ export function ExpenseEvaluator({ orgId, onComplete }: { orgId: string; onCompl
 
         {/* Agent response */}
         {state.step !== 'form' && state.step !== 'evaluating' && (
-          <div className={`rounded-lg p-3 border ${
+          <div className={`rounded-lg p-3 border opacity-0 animate-[fadeIn_0.5s_ease-out_forwards] ${
             isApproved
               ? 'bg-emerald-400/5 border-emerald-500/20'
               : 'bg-red-400/5 border-red-500/20'
@@ -162,17 +159,9 @@ export function ExpenseEvaluator({ orgId, onComplete }: { orgId: string; onCompl
               <span className="text-xs text-gray-500">{state.evaluation.description}</span>
             </div>
 
-            {/* Reasoning with typewriter */}
+            {/* Reasoning */}
             <div className="text-sm text-gray-300 leading-relaxed">
-              {(state.step === 'result' || state.step === 'recorded') && !typingDone ? (
-                <TypewriterText
-                  text={state.evaluation.reasoning}
-                  speed={15}
-                  onComplete={() => setTypingDone(true)}
-                />
-              ) : (
-                <span className="whitespace-pre-wrap">{state.evaluation.reasoning}</span>
-              )}
+              <span className="whitespace-pre-wrap">{state.evaluation.reasoning}</span>
             </div>
 
             {/* Record expense action (only on approval) */}

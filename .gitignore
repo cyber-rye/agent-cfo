@@ -25,9 +25,12 @@ Thumbs.db
 docker/data/
 
 ## Env
-.env
 appsettings.Development.json
 
 ## Test
 coverage/
 TestResults/
+
+## Secrets
+start-api.sh
+.env

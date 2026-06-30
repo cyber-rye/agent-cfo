@@ -24,6 +24,10 @@ services:
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=agentcfo;Username=agentcfo;Password=agentcfo
       - ASPNETCORE_ENVIRONMENT=Development
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - XIAOMI_API_KEY=${XIAOMI_API_KEY:-}
+      - XIAOMI_BASE_URL=${XIAOMI_BASE_URL:-}
     depends_on:
       postgres:
         condition: service_healthy

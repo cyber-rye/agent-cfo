@@ -19,7 +19,16 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// Stripe configuration
+// Stripe configuration — load API key from env if not in config
+var stripeSecretKey = builder.Configuration["Stripe:SecretKey"];
+if (string.IsNullOrEmpty(stripeSecretKey))
+    stripeSecretKey = Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY");
+if (!string.IsNullOrEmpty(stripeSecretKey))
+{
+    Stripe.StripeConfiguration.ApiKey = stripeSecretKey;
+    Console.WriteLine($"Stripe API key loaded: {stripeSecretKey[..12]}...");
+}
+
 builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection("Stripe"));
 
 // CORS for dashboard
