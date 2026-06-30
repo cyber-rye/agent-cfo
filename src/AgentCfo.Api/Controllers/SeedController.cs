@@ -2,7 +2,9 @@ using AgentCfo.Core.Common;
 using AgentCfo.Core.Entities;
 using AgentCfo.Core.Enums;
 using AgentCfo.Core.Interfaces;
+using AgentCfo.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AgentCfo.Api.Controllers;
 
@@ -10,6 +12,7 @@ namespace AgentCfo.Api.Controllers;
 [Route("api/[controller]")]
 public class SeedController : ControllerBase
 {
+    private readonly AppDbContext _db;
     private readonly IOrganizationRepository _orgRepo;
     private readonly ITransactionRepository _transactionRepo;
     private readonly IBudgetRepository _budgetRepo;
@@ -17,12 +20,14 @@ public class SeedController : ControllerBase
     private readonly IUnitOfWork _unitOfWork;
 
     public SeedController(
+        AppDbContext db,
         IOrganizationRepository orgRepo,
         ITransactionRepository transactionRepo,
         IBudgetRepository budgetRepo,
         IAgentDecisionRepository decisionRepo,
         IUnitOfWork unitOfWork)
     {
+        _db = db;
         _orgRepo = orgRepo;
         _transactionRepo = transactionRepo;
         _budgetRepo = budgetRepo;
@@ -33,6 +38,15 @@ public class SeedController : ControllerBase
     [HttpPost("demo")]
     public async Task<IActionResult> SeedDemoData(CancellationToken ct)
     {
+        // Clear existing data
+        _db.AuditEntries.RemoveRange(_db.AuditEntries);
+        _db.AgentDecisions.RemoveRange(_db.AgentDecisions);
+        _db.Transactions.RemoveRange(_db.Transactions);
+        _db.Budgets.RemoveRange(_db.Budgets);
+        _db.Forecasts.RemoveRange(_db.Forecasts);
+        _db.Organizations.RemoveRange(_db.Organizations);
+        await _db.SaveChangesAsync(ct);
+
         var org = Organization.Create("NovaCRM", "cus_demo_nova", Money.From(45000, "USD"));
         await _orgRepo.AddAsync(org, ct);
         var orgId = org.Id;
@@ -71,7 +85,7 @@ public class SeedController : ControllerBase
                 transactions.Add(Transaction.CreateRevenue(
                     orgId, Money.From(Math.Round(amount, 2), "USD"),
                     $"Subscription - {plan} Plan",
-                    $"evt_sub_{month}_{i}", $"pi_{Guid.NewGuid():N[..12]}", date));
+                    $"evt_sub_{month}_{i}", $"pi_{Guid.NewGuid().ToString("N")[..12]}", date));
             }
 
             // Occasional refund (0-1 per month)
