@@ -80,9 +80,13 @@ export function AgentFeed({ decisions, typingIds }: AgentFeedProps) {
       setExpandedIds(new Set(decisions.map(d => d.id)));
       initialLoadRef.current = false;
     }
-    // When typingIds changes (Run Analysis), expand those IDs
+    // When typingIds changes (Run Analysis/Quick Actions), expand new IDs without collapsing existing
     if (typingIds && typingIds.size > 0) {
-      setExpandedIds(new Set(typingIds));
+      setExpandedIds(prev => {
+        const next = new Set(prev);
+        for (const id of typingIds) next.add(id);
+        return next;
+      });
     }
   }, [decisions, typingIds]);
 
