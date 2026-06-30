@@ -36,6 +36,7 @@ public class SeedController : ControllerBase
         var org = Organization.Create("NovaCRM", $"cus_demo_{Guid.NewGuid().ToString("N")[..8]}", Money.From(45000, "USD"));
         await _orgRepo.AddAsync(org, ct);
         var orgId = org.Id;
+        var seedId = Guid.NewGuid().ToString("N")[..8];
         var random = new Random(42);
         var now = DateTime.UtcNow;
 
@@ -71,7 +72,7 @@ public class SeedController : ControllerBase
                 transactions.Add(Transaction.CreateRevenue(
                     orgId, Money.From(Math.Round(amount, 2), "USD"),
                     $"Subscription - {plan} Plan",
-                    $"evt_sub_{month}_{i}", $"pi_{Guid.NewGuid().ToString("N")[..12]}", date));
+                    $"evt_{seedId}_{month}_{i}", $"pi_{Guid.NewGuid().ToString("N")[..12]}", date));
             }
 
             // Occasional refund (0-1 per month)
