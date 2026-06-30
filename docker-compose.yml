@@ -20,7 +20,7 @@ services:
       context: .
       dockerfile: src/AgentCfo.Api/Dockerfile
     ports:
-      - "5000:8080"
+      - "5077:8080"
     environment:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=agentcfo;Username=agentcfo;Password=agentcfo
       - ASPNETCORE_ENVIRONMENT=Development
