@@ -23,7 +23,7 @@ type EvalState =
   | { step: 'recording'; evaluation: ExpenseEvaluation }
   | { step: 'recorded'; evaluation: ExpenseEvaluation; recordResult: ExpenseRecordResult };
 
-export function ExpenseEvaluator({ orgId }: { orgId: string }) {
+export function ExpenseEvaluator({ orgId, onComplete }: { orgId: string; onComplete?: () => void }) {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState(4); // default: Tools
@@ -42,6 +42,7 @@ export function ExpenseEvaluator({ orgId }: { orgId: string }) {
     try {
       const evaluation = await api.evaluateExpense(orgId, parsedAmount, description.trim());
       setState({ step: 'result', evaluation });
+      onComplete?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Evaluation failed');
       setState({ step: 'form' });
@@ -57,6 +58,7 @@ export function ExpenseEvaluator({ orgId }: { orgId: string }) {
     try {
       const recordResult = await api.recordExpense(orgId, parsedAmount, description.trim(), category);
       setState({ step: 'recorded', evaluation: state.evaluation, recordResult });
+      onComplete?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Recording failed');
       setState({ step: 'result', evaluation: state.evaluation });

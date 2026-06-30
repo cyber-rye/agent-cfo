@@ -138,37 +138,66 @@ public class AgentService : IAgentService
         var budgets = await _budgetRepo.GetByOrganizationAsync(organizationId, ct);
         var metrics = await _revenueMetrics.GetMetricsAsync(organizationId, ct);
 
-        // Analyze the expense request
         var totalBudget = budgets.Sum(b => b.MonthlyLimit.Amount);
         var totalSpend = budgets.Sum(b => b.CurrentSpend.Amount);
         var expenseRatio = totalBudget > 0 ? (amount.Amount / totalBudget * 100) : 0;
 
+        // Check per-category budget — infer category from description
+        var descLower = description.ToLower();
+        Budget? matchingBudget = null;
+        foreach (var budget in budgets)
+        {
+            var cat = budget.Category.ToString().ToLower();
+            if (descLower.Contains(cat) ||
+                (cat == "marketing" && (descLower.Contains("ads") || descLower.Contains("facebook") || descLower.Contains("google") || descLower.Contains("linkedin") || descLower.Contains("campaign"))) ||
+                (cat == "infrastructure" && (descLower.Contains("aws") || descLower.Contains("cloud") || descLower.Contains("server") || descLower.Contains("hosting"))) ||
+                (cat == "tools" && (descLower.Contains("software") || descLower.Contains("saas") || descLower.Contains("license") || descLower.Contains("subscription") || descLower.Contains("figma") || descLower.Contains("slack"))) ||
+                (cat == "contractors" && (descLower.Contains("freelance") || descLower.Contains("agency") || descLower.Contains("contractor"))) ||
+                (cat == "office" && (descLower.Contains("rent") || descLower.Contains("coworking") || descLower.Contains("office"))))
+            {
+                matchingBudget = budget;
+                break;
+            }
+        }
+
+        // Deny if: >20% of total budget OR would exceed category budget
+        bool wouldExceedCategory = matchingBudget is not null &&
+            (matchingBudget.CurrentSpend.Add(amount)).IsGreaterThan(matchingBudget.MonthlyLimit);
+
         AgentDecision decision;
 
-        if (expenseRatio > 20)
+        if (expenseRatio > 20 || wouldExceedCategory)
         {
+            var reason = expenseRatio > 20
+                ? $"This represents {expenseRatio:F0}% of total monthly budget ({Money.From(totalBudget, amount.Currency)})."
+                : $"Would exceed {matchingBudget!.Category} budget: current spend {matchingBudget.CurrentSpend} + {amount} > limit {matchingBudget.MonthlyLimit}.";
+
             decision = AgentDecision.Propose(
                 organizationId,
                 AgentDecisionType.ExpenseDenied,
-                $"Expense request denied: {amount} exceeds spending policy",
+                $"Expense request denied: {amount} for {description}",
                 $"Evaluating expense request: {amount} for '{description}'. " +
-                $"This represents {expenseRatio:F0}% of total monthly budget ({Money.From(totalBudget, amount.Currency)}). " +
+                $"{reason} " +
                 $"Current total spend: {Money.From(totalSpend, amount.Currency)}. " +
                 $"Monthly recurring revenue: {metrics?.MonthlyRecurringRevenue ?? Money.Zero()}. " +
-                $"DENY — expense ratio too high relative to budget. " +
-                $"Recommend: Break into smaller requests or negotiate payment terms.");
+                $"DENY — budget constraint violated. " +
+                $"Recommend: Reduce scope, negotiate pricing, or wait until next budget cycle.");
         }
         else
         {
+            var categoryNote = matchingBudget is not null
+                ? $"{matchingBudget.Category} budget impact: {matchingBudget.CurrentSpend.Add(amount)} / {matchingBudget.MonthlyLimit}."
+                : "No specific category budget matched — within total budget.";
+
             decision = AgentDecision.Propose(
                 organizationId,
                 AgentDecisionType.ExpenseApproved,
                 $"Expense request approved: {description}",
                 $"Evaluating expense request: {amount} for '{description}'. " +
                 $"Budget impact: {expenseRatio:F1}% of total monthly budget. " +
-                $"Current burn rate supports this expenditure. " +
-                $"MRR: {metrics?.MonthlyRecurringRevenue ?? Money.Zero()}, " +
-                $"Net income trend: positive. APPROVED.");
+                $"{categoryNote} " +
+                $"MRR: {metrics?.MonthlyRecurringRevenue ?? Money.Zero()}. " +
+                $"APPROVED — within budget constraints.");
         }
 
         await _decisionRepo.AddAsync(decision, ct);

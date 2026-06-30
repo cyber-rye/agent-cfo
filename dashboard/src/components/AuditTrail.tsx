@@ -21,6 +21,7 @@ function timeAgo(dateStr: string): string {
 export function AuditTrail({ orgId }: { orgId: string }) {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,8 +58,14 @@ export function AuditTrail({ orgId }: { orgId: string }) {
           entries.map(entry => {
             const config = actorConfig[entry.actor] || actorConfig.System;
             const Icon = config.icon;
+            const isHovered = hoveredId === entry.id;
             return (
-              <div key={entry.id} className="flex items-start gap-2 py-1.5 group">
+              <div
+                key={entry.id}
+                className="relative flex items-start gap-2 py-1.5 group"
+                onMouseEnter={() => setHoveredId(entry.id)}
+                onMouseLeave={() => setHoveredId(null)}
+              >
                 <div className="mt-0.5 shrink-0">
                   <Icon size={12} className={config.color} />
                 </div>
@@ -73,6 +80,40 @@ export function AuditTrail({ orgId }: { orgId: string }) {
                 <span className="text-[10px] text-gray-600 shrink-0 group-hover:text-gray-400 transition-colors">
                   {timeAgo(entry.createdAt)}
                 </span>
+
+                {/* Hover tooltip with full details */}
+                {isHovered && (
+                  <div className="absolute right-0 top-full mt-1 z-50 w-64 p-3 bg-gray-900 border border-gray-600 rounded-lg shadow-lg text-xs space-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Actor</span>
+                      <span className="text-gray-300">{entry.actor} ({entry.actorId})</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Action</span>
+                      <span className="text-gray-300">{entry.action}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Entity</span>
+                      <span className="text-gray-300">{entry.entityType}</span>
+                    </div>
+                    {entry.entityId && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Entity ID</span>
+                        <span className="text-gray-400 font-mono truncate ml-2">{entry.entityId.slice(0, 12)}...</span>
+                      </div>
+                    )}
+                    {entry.correlationId && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Correlation</span>
+                        <span className="text-gray-400 font-mono truncate ml-2">{entry.correlationId.slice(0, 12)}...</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Time</span>
+                      <span className="text-gray-400">{new Date(entry.createdAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })

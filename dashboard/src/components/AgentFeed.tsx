@@ -28,7 +28,7 @@ function DecisionItem({ decision, expanded, useTyping }: DecisionItemProps) {
   const isOpen = userToggled !== null ? userToggled : expanded;
 
   return (
-    <div className="border border-gray-700 rounded-lg p-4 hover:border-gray-600 transition-colors">
+    <div className={`border border-gray-700 rounded-lg p-4 hover:border-gray-600 transition-colors ${useTyping ? 'feed-card-enter' : ''}`}>
       <button
         onClick={() => setUserToggled(prev => prev !== null ? !prev : !expanded)}
         className="w-full flex items-start gap-3 text-left"

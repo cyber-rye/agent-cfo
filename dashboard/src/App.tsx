@@ -310,7 +310,7 @@ export default function App() {
                 <AgentFeed decisions={decisions} typingIds={typingIds} />
                 <div className="space-y-3">
                   <QuickActions orgId={orgId} onComplete={handleQuickActionComplete} />
-                  <ExpenseEvaluator orgId={orgId} />
+                  <ExpenseEvaluator orgId={orgId} onComplete={handleQuickActionComplete} />
                 </div>
               </div>
               <div className="space-y-4">
